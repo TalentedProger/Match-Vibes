@@ -4,10 +4,13 @@
  */
 
 import 'dotenv/config'
-import { bot } from '../src/bot'
+import { getBot } from '../src/bot'
 
 console.log('🤖 Starting MatchVibe bot in polling mode...')
 console.log('📍 Environment:', process.env.NODE_ENV || 'development')
+
+// Get bot instance
+const bot = getBot()
 
 // Start the bot in polling mode
 bot

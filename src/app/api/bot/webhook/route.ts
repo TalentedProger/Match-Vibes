@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { webhookCallback } from 'grammy'
-import { bot } from '@/bot'
+import { getBot } from '@/bot'
 
 /**
  * Verify webhook secret token
@@ -31,6 +31,7 @@ export async function POST(request: NextRequest) {
     const update = await request.json()
 
     // Handle the update using grammy's webhook callback
+    const bot = getBot()
     const handler = webhookCallback(bot, 'std/http')
     await handler(update)
 
