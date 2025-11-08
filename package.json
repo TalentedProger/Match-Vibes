@@ -14,7 +14,8 @@
     "prepare": "husky",
     "bot:dev": "tsx watch scripts/bot-dev.ts",
     "bot:webhook": "tsx scripts/set-webhook.ts",
-    "bot:menu": "tsx scripts/setup-menu-button.ts"
+    "bot:menu": "tsx scripts/setup-menu-button.ts",
+    "bot:check": "tsx scripts/check-token.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.7.0",

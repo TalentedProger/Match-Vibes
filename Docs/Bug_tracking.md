@@ -27,7 +27,191 @@ This document tracks all bugs, errors, and issues encountered during development
 
 ### Currently Active Issues
 
-> No active bugs. All issues resolved.
+**[BUG-008]** 🔴 **Токен бота скомпрометирован** - Требует немедленной замены токена  
+→ См. `/TOKEN_SECURITY_FIX.md` для решения
+
+---
+
+## [BUG-008] Токен бота скомпрометирован
+
+**Date Reported:** 2025-01-08  
+**Status:** 🔴 Critical - Требует немедленного действия  
+**Severity:** 🔴 Critical  
+**Affected Module:** Security, Telegram Bot  
+**Environment:** All
+
+### Symptoms
+
+- Информация о боте @VibesMatch_bot заполнена чужими ссылками
+- Третьи лица получили доступ к боту
+- Возможно использование для спама
+
+### Root Cause
+
+Токен бота был скомпрометирован (возможные причины):
+
+- Случайный коммит в публичный репозиторий
+- Утечка через логи или документацию
+- Незащищенная передача токена
+
+### Solution
+
+**Немедленные действия:**
+
+1. **Создайте новый токен:**
+   - @BotFather → `/mybots` → Выберите бот
+   - API Token → Revoke current token
+   - Скопируйте новый токен
+
+2. **Обновите везде:**
+   - `.env.local` (локально)
+   - Vercel Environment Variables
+   - Любые другие места
+
+3. **Проверьте отзыв старого:**
+   ```bash
+   curl "https://api.telegram.org/bot<OLD_TOKEN>/getMe"
+   # Должен вернуть 401 Unauthorized
+   ```
+
+### Prevention
+
+- ✅ Никогда не коммитить токены в Git
+- ✅ Использовать `.env.local` (в `.gitignore`)
+- ✅ Использовать Vercel Environment Variables
+- ✅ Использовать `process.env.*` вместо hardcode
+- ✅ Разные токены для dev/prod
+- ✅ Регулярная ротация токенов
+
+### Documentation
+
+См. `/TOKEN_SECURITY_FIX.md` для полной инструкции
+
+---
+
+## [BUG-007] Кнопка "Погнали" отображается как "Загрузка..." и не кликабельна
+
+**Date Reported:** 2025-01-08  
+**Status:** ✅ Resolved  
+**Severity:** 🔴 Critical  
+**Affected Module:** Authentication, UI/UX  
+**Environment:** Production, Browser (non-Telegram)
+
+### Symptoms
+
+- Кнопка "Погнали!" застревает в состоянии "Загрузка..."
+- Кнопка не кликабельна
+- Приложение не переходит к следующему экрану
+- Происходит когда открыто не в Telegram Mini App
+
+### Root Cause
+
+1. **Бесконечное состояние загрузки:**
+   - `isLoading` в auth-store застревает в `true`
+   - Нет таймаута для сброса состояния
+   - API `/api/auth/telegram` не отвечает в браузере
+
+2. **Нет fallback для не-Telegram окружения:**
+   - Приложение ожидает Telegram WebApp API
+   - В обычном браузере API недоступен
+   - Нет проверки окружения
+
+3. **Бесконечный цикл попыток:**
+   - `useEffect` постоянно пытается логиниться
+   - Нет флага "попытка сделана"
+   - Каждый render вызывает новую попытку
+
+### Solution
+
+#### 1. Обновлен `use-auth.ts`:
+
+```typescript
+// Добавлен таймаут для isLoading
+useEffect(() => {
+  const timeout = setTimeout(() => {
+    if (isLoading && !isAuthenticated) {
+      console.warn('Login timeout - resetting loading state')
+      setLoading(false)
+    }
+  }, 10000) // 10 second timeout
+  return () => clearTimeout(timeout)
+}, [isLoading, isAuthenticated, setLoading])
+
+// Добавлена проверка окружения
+const loginAttemptedRef = useRef(false)
+
+useEffect(() => {
+  if (
+    isReady &&
+    initData &&
+    !isAuthenticated &&
+    !isLoading &&
+    !loginAttemptedRef.current
+  ) {
+    loginAttemptedRef.current = true
+    login(initData).catch(err => {
+      console.error('Auto-login failed:', err)
+      setLoading(false)
+    })
+  }
+
+  // Fallback для не-Telegram
+  if (isReady && !initData && !loginAttemptedRef.current) {
+    loginAttemptedRef.current = true
+    console.log('Telegram WebApp not detected - running in browser mode')
+    setLoading(false)
+  }
+}, [initData, isAuthenticated, isLoading, login, isReady, setLoading])
+```
+
+#### 2. Обновлен `page.tsx`:
+
+```typescript
+// Добавлена проверка Telegram окружения
+const { isTelegramEnv } = useAuth()
+
+// Динамический текст кнопки
+const buttonText = isLoading
+  ? 'Загрузка...'
+  : !isTelegramEnv
+    ? 'Открыть в Telegram'
+    : 'Погнали! 🚀'
+
+// Warning для не-Telegram
+{!isTelegramEnv && !isLoading && (
+  <div className="bg-warning/10 border border-warning/20 rounded-2xl p-4">
+    <AlertCircle className="h-5 w-5 text-warning" />
+    <p>Для полного функционала откройте через Telegram Mini App</p>
+  </div>
+)}
+```
+
+#### 3. Улучшен UX:
+
+- Добавлен responsive дизайн (`sm:` брейкпоинты)
+- Добавлен `disabled:cursor-not-allowed`
+- Добавлено предупреждение для браузера
+- Улучшена типографика
+
+### Files Changed
+
+- `src/hooks/use-auth.ts` - таймаут, проверка окружения
+- `src/app/page.tsx` - UX улучшения, responsive
+
+### Testing Results
+
+- ✅ Кнопка кликабельна в Telegram Mini App
+- ✅ Кнопка кликабельна в обычном браузере
+- ✅ Нет бесконечной загрузки
+- ✅ Правильный fallback для не-Telegram
+- ✅ Responsive дизайн работает
+
+### Prevention
+
+- Всегда добавлять таймауты для async операций
+- Проверять окружение перед API вызовами
+- Использовать `useRef` для предотвращения повторных вызовов
+- Тестировать в разных окружениях (Telegram, браузер)
 
 ---
 
@@ -601,11 +785,11 @@ pnpm remove autoprefixer tailwindcss-animate
 
 | Severity    | Total | Resolved | Active | Resolution Rate |
 | ----------- | ----- | -------- | ------ | --------------- |
-| 🔴 Critical | 1     | 1        | 0      | 100%            |
-| 🟡 High     | 1     | 1        | 0      | 100%            |
+| 🔴 Critical | 4     | 3        | 1      | 75%             |
+| 🟡 High     | 3     | 3        | 0      | 100%            |
 | 🟢 Medium   | 0     | 0        | 0      | -               |
 | ⚪ Low      | 0     | 0        | 0      | -               |
-| **Total**   | **2** | **2**    | **0**  | **100%**        |
+| **Total**   | **7** | **6**    | **1**  | **86%**         |
 
 ---
 
