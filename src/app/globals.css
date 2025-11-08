@@ -62,21 +62,20 @@
 }
 
 html {
-  /* Prevent zoom on input focus */
-  touch-action: manipulation;
+  /* Allow vertical scroll, prevent zoom */
+  touch-action: pan-y;
   /* Enable smooth scrolling */
   -webkit-overflow-scrolling: touch;
-  /* Lock viewport */
-  -ms-touch-action: manipulation;
   /* Prevent zoom */
   -webkit-text-size-adjust: 100%;
   -ms-text-size-adjust: 100%;
   text-size-adjust: 100%;
   /* Full height */
-  height: 100%;
+  min-height: 100%;
   width: 100%;
-  /* No scroll on html */
-  overflow: hidden;
+  /* Allow scroll */
+  overflow-x: hidden;
+  overflow-y: auto;
 }
 
 body {
@@ -89,20 +88,16 @@ body {
   padding: env(safe-area-inset-top) env(safe-area-inset-right)
     env(safe-area-inset-bottom) env(safe-area-inset-left);
   /* Prevent overscroll bounce */
-  overscroll-behavior: none;
-  /* Fixed position for mobile */
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  overscroll-behavior-y: contain;
+  overscroll-behavior-x: none;
+  /* Allow scrolling */
   overflow-y: auto;
   overflow-x: hidden;
   /* Minimum font size to prevent iOS zoom */
   -webkit-text-size-adjust: 100%;
   /* Full height */
   width: 100%;
-  height: 100%;
+  min-height: 100vh;
 }
 
 /* Enable touch for interactive elements */

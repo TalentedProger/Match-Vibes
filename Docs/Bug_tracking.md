@@ -38,6 +38,147 @@ This document tracks all bugs, errors, and issues encountered during development
 
 ---
 
+## [BUG-011] Мобильный зум и вертикальный скролл
+
+**Date Reported:** 2025-01-08  
+**Status:** ✅ Resolved  
+**Severity:** 🔴 Critical  
+**Affected Module:** UI/UX, Mobile Interface  
+**Environment:** Production (Mobile)
+
+### Symptoms
+
+- Пользователи могут увеличивать и уменьшать экран (pinch-to-zoom) на мобильных устройствах
+- Вертикальный скролл не работает на всех страницах
+- Контент не помещается и не листается вниз
+- Приложение непригодно для использования на мобильных устройствах
+
+### Root Cause
+
+**Проблема 1: Зум не блокируется**
+
+- В Next.js 15 viewport должен экспортироваться отдельно от metadata
+- Viewport внутри metadata объекта не применяется корректно
+- `userScalable: false` и `maximumScale: 1` игнорируются
+
+**Проблема 2: Вертикальный скролл заблокирован**
+
+- `html { overflow: hidden }` полностью блокировал скролл
+- `body { position: fixed }` делал body нескроллируемым
+- `touch-action: manipulation` не разрешал вертикальный скролл при запрете зума
+- Контент не мог прокручиваться вниз даже с `overflow-y: auto` на элементах
+
+### Solution
+
+#### 1. Исправлен viewport export в `layout.tsx`:
+
+```typescript
+// До (не работало):
+export const metadata: Metadata = {
+  viewport: {
+    width: 'device-width',
+    initialScale: 1,
+    maximumScale: 1,
+    userScalable: false,
+    viewportFit: 'cover',
+  },
+  // ...
+}
+
+// После (работает):
+import type { Metadata, Viewport } from 'next'
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: 'cover',
+}
+```
+
+#### 2. Исправлен scroll в `globals.css`:
+
+```css
+/* До (не работало): */
+html {
+  touch-action: manipulation;
+  overflow: hidden;
+  height: 100%;
+}
+
+body {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  overflow-y: auto;
+  height: 100%;
+}
+
+/* После (работает): */
+html {
+  touch-action: pan-y; /* Разрешает вертикальный скролл, запрещает зум */
+  overflow-x: hidden;
+  overflow-y: auto;
+  min-height: 100%;
+}
+
+body {
+  /* Убран position: fixed */
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior-y: contain; /* Предотвращает bounce */
+  overscroll-behavior-x: none;
+  min-height: 100vh;
+}
+```
+
+### Files Changed
+
+- `src/app/layout.tsx` - viewport экспортируется отдельно
+- `src/app/globals.css` - разрешен вертикальный скролл, улучшен touch-action
+
+### Testing Results
+
+- ✅ Зум (pinch-to-zoom) заблокирован на всех мобильных устройствах
+- ✅ Вертикальный скролл работает на всех страницах
+- ✅ Контент корректно прокручивается вниз
+- ✅ Overscroll bounce контролируется
+- ✅ Safe-area поддержка сохранена для Telegram
+- ✅ Все интерактивные элементы остались кликабельными
+
+### Key Insights
+
+1. **Next.js 15 Viewport Export:**
+   - Viewport должен экспортироваться отдельно от metadata
+   - `export const viewport: Viewport = { ... }` вместо `metadata.viewport`
+   - Это breaking change в Next.js 15
+
+2. **Touch Action:**
+   - `touch-action: manipulation` - запрещает double-tap zoom, НО разрешает pinch-to-zoom
+   - `touch-action: pan-y` - разрешает ТОЛЬКО вертикальный скролл, запрещает ВСЕ виды зума
+   - Правильный выбор: `pan-y` на html + viewport meta-теги
+
+3. **Position Fixed на Body:**
+   - `position: fixed` на body блокирует скролл даже с `overflow-y: auto`
+   - Не используйте fixed positioning для body в scroll-приложениях
+   - Используйте `min-height: 100vh` вместо `height: 100%` + `position: fixed`
+
+### Prevention
+
+- Всегда экспортировать viewport отдельно в Next.js 15+
+- Не использовать `position: fixed` на body
+- Использовать `touch-action: pan-y` для блокировки зума при разрешении скролла
+- Тестировать скролл на реальных мобильных устройствах
+- Тестировать зум (pinch-to-zoom) на iOS и Android
+
+**Date Resolved:** 2025-01-08  
+**Resolved By:** Development Team
+
+---
+
 ## [BUG-010] База данных Supabase не настроена
 
 **Date Reported:** 2025-01-08  
@@ -964,13 +1105,13 @@ pnpm remove autoprefixer tailwindcss-animate
 
 ## 📊 Bug Statistics
 
-| Severity    | Total | Resolved | Active | Resolution Rate |
-| ----------- | ----- | -------- | ------ | --------------- |
-| 🔴 Critical | 5     | 3        | 2      | 60%             |
-| 🟡 High     | 4     | 4        | 0      | 100%            |
-| 🟢 Medium   | 0     | 0        | 0      | -               |
-| ⚪ Low      | 0     | 0        | 0      | -               |
-| **Total**   | **9** | **7**    | **2**  | **78%**         |
+| Severity    | Total  | Resolved | Active | Resolution Rate |
+| ----------- | ------ | -------- | ------ | --------------- |
+| 🔴 Critical | 6      | 4        | 2      | 67%             |
+| 🟡 High     | 4      | 4        | 0      | 100%            |
+| 🟢 Medium   | 0      | 0        | 0      | -               |
+| ⚪ Low      | 0      | 0        | 0      | -               |
+| **Total**   | **10** | **8**    | **2**  | **80%**         |
 
 ---
 

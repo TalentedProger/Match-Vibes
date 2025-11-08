@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import './globals.css'
 import { TelegramProvider } from '@/components/providers/telegram-provider'
 import { ThemeProvider } from '@/components/providers/theme-provider'
@@ -6,13 +6,6 @@ import { ThemeProvider } from '@/components/providers/theme-provider'
 export const metadata: Metadata = {
   title: 'MatchVibe - Find Your Shared Vibe',
   description: 'Discover shared interests through interactive games',
-  viewport: {
-    width: 'device-width',
-    initialScale: 1,
-    maximumScale: 1,
-    userScalable: false,
-    viewportFit: 'cover',
-  },
   themeColor: [
     { media: '(prefers-color-scheme: light)', color: '#fafafa' },
     { media: '(prefers-color-scheme: dark)', color: '#141419' },
@@ -22,6 +15,14 @@ export const metadata: Metadata = {
     statusBarStyle: 'default',
     title: 'MatchVibe',
   },
+}
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: 'cover',
 }
 
 export default function RootLayout({

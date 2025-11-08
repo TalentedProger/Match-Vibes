@@ -47,7 +47,70 @@ export interface Database {
           updated_at?: string
         }
       }
-      // More tables will be added after schema creation
+      categories: {
+        Row: {
+          id: string
+          name: string
+          description: string | null
+          icon: string | null
+          image_url: string | null
+          color: string | null
+          order_index: number
+          is_active: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          name: string
+          description?: string | null
+          icon?: string | null
+          image_url?: string | null
+          color?: string | null
+          order_index?: number
+          is_active?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          name?: string
+          description?: string | null
+          icon?: string | null
+          image_url?: string | null
+          color?: string | null
+          order_index?: number
+          is_active?: boolean
+          created_at?: string
+        }
+      }
+      questions: {
+        Row: {
+          id: string
+          category_id: string
+          text: string
+          image_url: string
+          order_index: number
+          is_active: boolean
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          category_id: string
+          text: string
+          image_url: string
+          order_index?: number
+          is_active?: boolean
+          created_at?: string
+        }
+        Update: {
+          id?: string
+          category_id?: string
+          text?: string
+          image_url?: string
+          order_index?: number
+          is_active?: boolean
+          created_at?: string
+        }
+      }
     }
     Views: {}
     Functions: {}
