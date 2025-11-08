@@ -1,3 +1,13 @@
+export interface Question {
+  id: string
+  category_id: string
+  text: string
+  image_url: string
+  order_index: number
+  is_active: boolean
+  created_at: string
+}
+
 export interface Response {
   id: string
   room_id: string
