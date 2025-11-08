@@ -1,7 +1,8 @@
--- MatchVibe Database Schema
+-- MatchVibe Database Schema - SAFE RERUN VERSION
 -- Supabase PostgreSQL Setup
--- Version: 1.0.0
+-- Version: 1.0.1
 -- Last Updated: 2025-01-08
+-- This script can be run multiple times safely
 
 -- Enable UUID extension
 CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
@@ -124,8 +125,9 @@ CREATE INDEX IF NOT EXISTS idx_results_guest_id ON results(guest_id);
 CREATE INDEX IF NOT EXISTS idx_favorites_user_id ON favorites(user_id);
 CREATE INDEX IF NOT EXISTS idx_questions_category_id ON questions(category_id);
 
--- Create updated_at trigger function
-CREATE OR REPLACE FUNCTION update_updated_at_column()
+-- Create updated_at trigger function (drop and recreate to avoid conflicts)
+DROP FUNCTION IF EXISTS update_updated_at_column() CASCADE;
+CREATE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
 BEGIN
   NEW.updated_at = NOW();
@@ -133,7 +135,8 @@ BEGIN
 END;
 $$ language 'plpgsql';
 
--- Add trigger to profiles table
+-- Add trigger to profiles table (drop and recreate to avoid conflicts)
+DROP TRIGGER IF EXISTS update_profiles_updated_at ON profiles;
 CREATE TRIGGER update_profiles_updated_at 
 BEFORE UPDATE ON profiles 
 FOR EACH ROW 
@@ -143,65 +146,80 @@ EXECUTE FUNCTION update_updated_at_column();
 -- SIMPLIFIED FOR TELEGRAM MINI APP (No Supabase Auth)
 -- Note: For production, consider implementing service role authentication
 
--- Profiles: Allow all operations (Telegram validates on API level)
+-- Enable RLS on all tables
 ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE rooms ENABLE ROW LEVEL SECURITY;
+ALTER TABLE responses ENABLE ROW LEVEL SECURITY;
+ALTER TABLE results ENABLE ROW LEVEL SECURITY;
+ALTER TABLE favorites ENABLE ROW LEVEL SECURITY;
+ALTER TABLE categories ENABLE ROW LEVEL SECURITY;
+ALTER TABLE questions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE achievements ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_achievements ENABLE ROW LEVEL SECURITY;
+
+-- Drop existing policies to avoid conflicts
+DROP POLICY IF EXISTS "Allow all operations on profiles" ON profiles;
+DROP POLICY IF EXISTS "Allow all operations on rooms" ON rooms;
+DROP POLICY IF EXISTS "Allow all operations on responses" ON responses;
+DROP POLICY IF EXISTS "Allow all operations on results" ON results;
+DROP POLICY IF EXISTS "Allow all operations on favorites" ON favorites;
+DROP POLICY IF EXISTS "Categories are viewable by everyone" ON categories;
+DROP POLICY IF EXISTS "Questions are viewable by everyone" ON questions;
+DROP POLICY IF EXISTS "Achievements are viewable by everyone" ON achievements;
+DROP POLICY IF EXISTS "Allow all operations on user_achievements" ON user_achievements;
+
+-- Profiles: Allow all operations (Telegram validates on API level)
 CREATE POLICY "Allow all operations on profiles"
   ON profiles
   USING (true)
   WITH CHECK (true);
 
 -- Rooms: Allow all operations
-ALTER TABLE rooms ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Allow all operations on rooms"
   ON rooms
   USING (true)
   WITH CHECK (true);
 
 -- Responses: Allow all operations
-ALTER TABLE responses ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Allow all operations on responses"
   ON responses
   USING (true)
   WITH CHECK (true);
 
 -- Results: Allow all operations
-ALTER TABLE results ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Allow all operations on results"
   ON results
   USING (true)
   WITH CHECK (true);
 
 -- Favorites: Allow all operations
-ALTER TABLE favorites ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Allow all operations on favorites"
   ON favorites
   USING (true)
   WITH CHECK (true);
 
--- Categories and Questions are public (read-only)
-ALTER TABLE categories ENABLE ROW LEVEL SECURITY;
-ALTER TABLE questions ENABLE ROW LEVEL SECURITY;
-ALTER TABLE achievements ENABLE ROW LEVEL SECURITY;
-ALTER TABLE user_achievements ENABLE ROW LEVEL SECURITY;
-
+-- Categories: Public read-only
 CREATE POLICY "Categories are viewable by everyone"
   ON categories FOR SELECT
   USING (is_active = TRUE);
 
+-- Questions: Public read-only
 CREATE POLICY "Questions are viewable by everyone"
   ON questions FOR SELECT
   USING (is_active = TRUE);
 
+-- Achievements: Public read-only
 CREATE POLICY "Achievements are viewable by everyone"
   ON achievements FOR SELECT
   USING (true);
 
+-- User Achievements: Allow all operations (users can unlock achievements)
 CREATE POLICY "Allow all operations on user_achievements"
   ON user_achievements
   USING (true)
   WITH CHECK (true);
 
--- Seed initial categories
+-- Seed initial categories (ON CONFLICT DO NOTHING to avoid duplicates)
 INSERT INTO categories (name, description, icon, color, order_index) VALUES
   ('Еда и напитки', 'Узнайте ваши общие вкусы в еде', '🍕', 'hsl(25, 100%, 66%)', 1),
   ('Фильмы', 'Найдите общие любимые фильмы', '🎬', 'hsl(276, 100%, 70%)', 2),
@@ -210,7 +228,7 @@ INSERT INTO categories (name, description, icon, color, order_index) VALUES
   ('Путешествия', 'Куда бы вы хотели поехать', '🏖️', 'hsl(210, 100%, 70%)', 5)
 ON CONFLICT DO NOTHING;
 
--- Seed initial achievements
+-- Seed initial achievements (ON CONFLICT DO NOTHING to avoid duplicates)
 INSERT INTO achievements (name, description, icon, requirement, type) VALUES
   ('Первая игра', 'Сыграйте первую игру', '🎯', 1, 'games'),
   ('10 игр', 'Сыграйте 10 игр', '🔥', 10, 'games'),
@@ -219,3 +237,11 @@ INSERT INTO achievements (name, description, icon, requirement, type) VALUES
   ('10 совпадений', 'Найдите 10 совпадений', '✨', 10, 'matches'),
   ('Высокая совместимость', 'Достигните 80%+ совместимости', '💯', 80, 'compatibility')
 ON CONFLICT DO NOTHING;
+
+-- Success message
+DO $$
+BEGIN
+  RAISE NOTICE '✅ Database schema created/updated successfully!';
+  RAISE NOTICE 'Created tables: profiles, categories, questions, rooms, responses, results, favorites, achievements, user_achievements';
+  RAISE NOTICE 'RLS policies configured for Telegram Mini App';
+END $$;
