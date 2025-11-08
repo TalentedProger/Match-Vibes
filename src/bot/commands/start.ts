@@ -25,6 +25,7 @@ export async function handleStartCommand(ctx: Context) {
 
     if (isHttps()) {
       // HTTPS - используем web_app кнопку
+      // Mini App will read invitation code from Telegram.WebApp.initDataUnsafe.start_param
       await ctx.reply(message, {
         parse_mode: 'Markdown',
         reply_markup: {
@@ -33,7 +34,7 @@ export async function handleStartCommand(ctx: Context) {
               {
                 text: '🎮 Присоединиться к игре',
                 web_app: {
-                  url: `${getAppUrl()}?startapp=invite_${invitationCode}`,
+                  url: `${getAppUrl()}/join/${invitationCode}`,
                 },
               },
             ],

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 
-export const dynamic = 'force-dynamic'
+// Cache questions for 5 minutes to improve performance
+export const revalidate = 300
 
 /**
  * GET /api/categories/[id]/questions
@@ -21,12 +22,12 @@ export async function GET(
       )
     }
 
-    const supabase = createClient()
+    const supabase = await createClient()
 
-    // Fetch questions for the category
+    // Fetch questions for the category (only needed fields)
     const { data: questions, error } = await supabase
       .from('questions')
-      .select('*')
+      .select('id, text, image_url, order_index')
       .eq('category_id', categoryId)
       .eq('is_active', true)
       .order('order_index', { ascending: true })

@@ -64,10 +64,15 @@ export function useRoom() {
   const getTelegramShareLink = useCallback(() => {
     if (!invitationCode) return null
 
-    const inviteLink = getInvitationLink()
-    const text = encodeURIComponent('Присоединяйся к игре в MatchVibe! 🎮')
-    return `https://t.me/share/url?url=${encodeURIComponent(inviteLink!)}&text=${text}`
-  }, [invitationCode, getInvitationLink])
+    // Use bot deep link instead of direct web link
+    const botUsername =
+      process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME || 'matchvibe_bot'
+    const botLink = `https://t.me/${botUsername}?start=invite_${invitationCode}`
+    const text = encodeURIComponent(
+      '🎮 Присоединяйся к игре в MatchVibe!\n👥 Давай узнаем, насколько совпадают наши вкусы!'
+    )
+    return `https://t.me/share/url?url=${encodeURIComponent(botLink)}&text=${text}`
+  }, [invitationCode])
 
   return {
     currentRoom,

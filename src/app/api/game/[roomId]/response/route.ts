@@ -31,7 +31,7 @@ export async function POST(
       )
     }
 
-    const supabase = createClient()
+    const supabase = await createClient()
 
     // Check if room exists and user is part of it
     const { data: room, error: roomError } = await supabase

@@ -4,12 +4,24 @@
 
 /**
  * Generate Telegram deep link for invitation
- * Format: https://t.me/botusername/app?startapp=invite_CODE
+ * Format: https://t.me/botusername?start=invite_CODE
+ * This will trigger the bot's /start command with the invitation code
  */
 export function generateInvitationDeepLink(invitationCode: string): string {
   const botUsername =
     process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME || 'matchvibe_bot'
-  return `https://t.me/${botUsername}/app?startapp=invite_${invitationCode}`
+  return `https://t.me/${botUsername}?start=invite_${invitationCode}`
+}
+
+/**
+ * Generate Telegram Mini App direct link
+ * Format: https://t.me/botusername/appname?startapp=invite_CODE
+ */
+export function generateMiniAppDeepLink(invitationCode: string): string {
+  const botUsername =
+    process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME || 'matchvibe_bot'
+  const appName = process.env.NEXT_PUBLIC_TELEGRAM_APP_NAME || 'app'
+  return `https://t.me/${botUsername}/${appName}?startapp=invite_${invitationCode}`
 }
 
 /**
