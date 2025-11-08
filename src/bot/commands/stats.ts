@@ -1,29 +1,40 @@
 import { Context } from 'grammy'
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3002'
-const isHttps = APP_URL.startsWith('https://')
+// Use server-side env variable (not NEXT_PUBLIC_) for dynamic reading
+const getAppUrl = () =>
+  process.env.APP_URL ||
+  process.env.NEXT_PUBLIC_APP_URL ||
+  'http://localhost:3002'
+const isHttps = () => getAppUrl().startsWith('https://')
 
 export async function handleStatsCommand(ctx: Context) {
-  const message = '📊 *Твоя статистика*\n\n' +
+  const message =
+    '📊 *Твоя статистика*\n\n' +
     'В приложении ты можешь посмотреть:\n' +
     '• Количество пройденных игр\n' +
     '• Средний процент совпадений\n' +
     '• Любимые категории\n' +
     '• История игр'
 
-  if (isHttps) {
+  if (isHttps()) {
     await ctx.reply(message, {
       parse_mode: 'Markdown',
       reply_markup: {
         inline_keyboard: [
-          [{ text: '📊 Открыть статистику', web_app: { url: `${APP_URL}/stats` } }]
-        ]
-      }
+          [
+            {
+              text: '📊 Открыть статистику',
+              web_app: { url: `${getAppUrl()}/stats` },
+            },
+          ],
+        ],
+      },
     })
   } else {
     await ctx.reply(
-      message + '\n\n' +
-      '📱 Открой игру через меню (☰) и перейди в \"Статистика\"',
+      message +
+        '\n\n' +
+        '📱 Открой игру через меню (☰) и перейди в \"Статистика\"',
       { parse_mode: 'Markdown' }
     )
   }

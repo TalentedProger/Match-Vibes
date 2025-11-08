@@ -63,7 +63,11 @@ export async function notifyPartnerJoined(
   hostTelegramId: number,
   roomId: string
 ) {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3002'
+  // Use server-side env variable (not NEXT_PUBLIC_) for dynamic reading
+  const appUrl =
+    process.env.APP_URL ||
+    process.env.NEXT_PUBLIC_APP_URL ||
+    'http://localhost:3002'
 
   await sendTelegramMessage(
     hostTelegramId,
@@ -89,7 +93,11 @@ export async function notifyGameResults(
   gameId: string,
   matchPercentage: number
 ) {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3002'
+  // Use server-side env variable (not NEXT_PUBLIC_) for dynamic reading
+  const appUrl =
+    process.env.APP_URL ||
+    process.env.NEXT_PUBLIC_APP_URL ||
+    'http://localhost:3002'
 
   await sendTelegramMessage(
     userTelegramId,
@@ -115,7 +123,11 @@ export async function sendInvitationReminder(
   guestTelegramId: number,
   invitationCode: string
 ) {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3002'
+  // Use server-side env variable (not NEXT_PUBLIC_) for dynamic reading
+  const appUrl =
+    process.env.APP_URL ||
+    process.env.NEXT_PUBLIC_APP_URL ||
+    'http://localhost:3002'
 
   await sendTelegramMessage(
     guestTelegramId,
@@ -136,7 +148,9 @@ export async function sendInvitationReminder(
 /**
  * Get Telegram user ID from database profile
  */
-export async function getUserTelegramId(userId: string): Promise<number | null> {
+export async function getUserTelegramId(
+  userId: string
+): Promise<number | null> {
   // This should be implemented to fetch telegram_id from profiles table
   // For now, return null as placeholder
   console.warn('getUserTelegramId not implemented yet')

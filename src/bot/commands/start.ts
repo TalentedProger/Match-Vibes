@@ -1,10 +1,14 @@
 import { Context } from 'grammy'
 
-const APP_URL = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3002'
+// Use server-side env variable (not NEXT_PUBLIC_) for dynamic reading
+const getAppUrl = () =>
+  process.env.APP_URL ||
+  process.env.NEXT_PUBLIC_APP_URL ||
+  'http://localhost:3002'
 const BOT_USERNAME = process.env.TELEGRAM_BOT_USERNAME || 'VibesMatch_bot'
 
 // Check if URL is HTTPS
-const isHttps = APP_URL.startsWith('https://')
+const isHttps = () => getAppUrl().startsWith('https://')
 
 export async function handleStartCommand(ctx: Context) {
   const startParam = ctx.match as string
@@ -13,32 +17,38 @@ export async function handleStartCommand(ctx: Context) {
   if (startParam && startParam.startsWith('invite_')) {
     const invitationCode = startParam.replace('invite_', '')
 
-    const message = '🎉 *Тебя пригласили в игру!*\n\n' +
+    const message =
+      '🎉 *Тебя пригласили в игру!*\n\n' +
       '👥 Присоединяйся к комнате и начни проходить тест вместе с другом.\n\n' +
       '✨ Узнайте, насколько совпадают ваши вкусы!\n\n' +
       `🔗 Код приглашения: \`${invitationCode}\``
 
-    if (isHttps) {
+    if (isHttps()) {
       // HTTPS - используем web_app кнопку
       await ctx.reply(message, {
         parse_mode: 'Markdown',
         reply_markup: {
           inline_keyboard: [
-            [{
-              text: '🎮 Присоединиться к игре',
-              web_app: { url: `${APP_URL}?startapp=invite_${invitationCode}` }
-            }]
-          ]
-        }
+            [
+              {
+                text: '🎮 Присоединиться к игре',
+                web_app: {
+                  url: `${getAppUrl()}?startapp=invite_${invitationCode}`,
+                },
+              },
+            ],
+          ],
+        },
       })
     } else {
       // HTTP - показываем инструкции
       await ctx.reply(
-        message + '\n\n' +
-        '📱 *Как открыть:*\n' +
-        '1️⃣ Нажми на кнопку меню (☰) внизу\n' +
-        '2️⃣ Выбери "🎮 Открыть игру"\n' +
-        '3️⃣ Игра откроется автоматически!',
+        message +
+          '\n\n' +
+          '📱 *Как открыть:*\n' +
+          '1️⃣ Нажми на кнопку меню (☰) внизу\n' +
+          '2️⃣ Выбери "🎮 Открыть игру"\n' +
+          '3️⃣ Игра откроется автоматически!',
         { parse_mode: 'Markdown' }
       )
     }
@@ -48,7 +58,8 @@ export async function handleStartCommand(ctx: Context) {
   // Default welcome message
   const firstName = ctx.from?.first_name || 'друг'
 
-  const welcomeMessage = `👋 *Привет, ${firstName}!*\n\n` +
+  const welcomeMessage =
+    `👋 *Привет, ${firstName}!*\n\n` +
     '🎮 Добро пожаловать в *MatchVibe* — игру для проверки совместимости!\n\n' +
     '✨ *Как это работает:*\n' +
     '• Создай комнату и выбери категорию\n' +
@@ -57,13 +68,13 @@ export async function handleStartCommand(ctx: Context) {
     '• Узнайте результаты!\n\n' +
     '🎯 Готов начать?'
 
-  if (isHttps) {
+  if (isHttps()) {
     // HTTPS - используем web_app кнопку
     await ctx.reply(welcomeMessage, {
       parse_mode: 'Markdown',
       reply_markup: {
         inline_keyboard: [
-          [{ text: '🎮 Начать игру', web_app: { url: APP_URL } }],
+          [{ text: '🎮 Начать игру', web_app: { url: getAppUrl() } }],
           [
             { text: '❓ Помощь', callback_data: 'help' },
             { text: '📊 Статистика', callback_data: 'stats' },
@@ -74,12 +85,13 @@ export async function handleStartCommand(ctx: Context) {
   } else {
     // HTTP - показываем инструкции
     await ctx.reply(
-      welcomeMessage + '\n\n' +
-      '📱 *Как открыть игру:*\n' +
-      '1️⃣ Нажми на кнопку меню (☰) внизу\n' +
-      '2️⃣ Выбери "🎮 Открыть игру"\n' +
-      '3️⃣ Начни играть!\n\n' +
-      '💡 Команды: /play, /help, /stats',
+      welcomeMessage +
+        '\n\n' +
+        '📱 *Как открыть игру:*\n' +
+        '1️⃣ Нажми на кнопку меню (☰) внизу\n' +
+        '2️⃣ Выбери "🎮 Открыть игру"\n' +
+        '3️⃣ Начни играть!\n\n' +
+        '💡 Команды: /play, /help, /stats',
       { parse_mode: 'Markdown' }
     )
   }
