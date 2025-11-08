@@ -4,9 +4,10 @@ import { createClient } from '@/lib/supabase/server'
 // GET /api/rooms/[roomId] - Get room by ID
 export async function GET(
   request: NextRequest,
-  { params }: { params: { roomId: string } }
+  props: { params: Promise<{ roomId: string }> }
 ) {
   try {
+    const params = await props.params
     const { roomId } = params
 
     if (!roomId) {
@@ -44,9 +45,10 @@ export async function GET(
 // PATCH /api/rooms/[roomId] - Update room status
 export async function PATCH(
   request: NextRequest,
-  { params }: { params: { roomId: string } }
+  props: { params: Promise<{ roomId: string }> }
 ) {
   try {
+    const params = await props.params
     const { roomId } = params
     const { status } = await request.json()
 

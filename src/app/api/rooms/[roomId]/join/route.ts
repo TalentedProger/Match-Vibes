@@ -4,9 +4,10 @@ import { createClient } from '@/lib/supabase/server'
 // POST /api/rooms/[roomId]/join - Join room by invitation code
 export async function POST(
   request: NextRequest,
-  { params }: { params: { roomId: string } }
+  props: { params: Promise<{ roomId: string }> }
 ) {
   try {
+    const params = await props.params
     const invitationCode = params.roomId // roomId is actually the invitation code in this route
     const { userId } = await request.json()
 
