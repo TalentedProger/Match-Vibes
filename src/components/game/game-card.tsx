@@ -13,6 +13,7 @@ interface GameCardProps {
 
 const SWIPE_THRESHOLD = 100
 const ROTATION_FACTOR = 0.1
+const VELOCITY_THRESHOLD = 500
 
 export function GameCard({
   question,
@@ -35,7 +36,10 @@ export function GameCard({
     const velocityX = info.velocity.x
 
     // Determine if swipe is strong enough
-    if (Math.abs(offsetX) > SWIPE_THRESHOLD || Math.abs(velocityX) > 500) {
+    if (
+      Math.abs(offsetX) > SWIPE_THRESHOLD ||
+      Math.abs(velocityX) > VELOCITY_THRESHOLD
+    ) {
       if (offsetX > 0) {
         onSwipe('right') // Like
       } else {
@@ -49,7 +53,7 @@ export function GameCard({
 
   return (
     <motion.div
-      className="relative w-full max-w-sm mx-auto"
+      className="relative w-full max-w-md mx-auto"
       style={{
         x,
         rotate,
@@ -58,7 +62,16 @@ export function GameCard({
       }}
       drag={disabled ? false : 'x'}
       dragConstraints={{ left: 0, right: 0 }}
-      dragElastic={0.7}
+      dragElastic={0.8}
+      dragTransition={{
+        bounceStiffness: 600,
+        bounceDamping: 20,
+      }}
+      transition={{
+        type: 'spring',
+        stiffness: 300,
+        damping: 30,
+      }}
       onDragStart={() => setIsDragging(true)}
       onDragEnd={handleDragEnd}
       whileTap={{ cursor: 'grabbing' }}

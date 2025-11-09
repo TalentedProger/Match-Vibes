@@ -37,8 +37,6 @@ export default function GamePage() {
     nextQuestion,
   } = useGameStore()
 
-  const [questionsData, setQuestionsData] = useState<Question[]>([])
-
   // Real-time partner tracking
   const { partnerProgress, isPartnerActive, roomStatus } = useGameRealtime(
     roomId,
@@ -64,8 +62,14 @@ export default function GamePage() {
         }
 
         const data = await response.json()
-        setQuestionsData(data.questions)
-        initGame(roomId, currentRoom.category_id, data.questions)
+
+        // Remove any potential duplicates from questions
+        const uniqueQuestions = data.questions.filter(
+          (q: Question, index: number, self: Question[]) =>
+            index === self.findIndex(t => t.id === q.id)
+        )
+
+        initGame(roomId, currentRoom.category_id, uniqueQuestions)
       } catch (err) {
         console.error('Error fetching questions:', err)
         setError('Не удалось загрузить вопросы')
@@ -139,7 +143,7 @@ export default function GamePage() {
   }, [isCompleted, responses.length, questions.length, roomId, router])
 
   // Loading state
-  if (isLoading || !questionsData.length) {
+  if (isLoading || !questions.length) {
     return (
       <AuthGuard>
         <div className="min-h-screen flex items-center justify-center">
@@ -204,16 +208,20 @@ export default function GamePage() {
         </div>
 
         {/* Main Game Area */}
-        <div className="flex-1 flex items-center justify-center px-4 pb-20">
+        <div className="flex-1 flex items-center justify-center px-4 py-8">
           <AnimatePresence mode="wait">
             {currentQuestion ? (
               <motion.div
                 key={currentQuestion.id}
-                initial={{ opacity: 0, scale: 0.8, y: 50 }}
+                initial={{ opacity: 0, scale: 0.9, y: 20 }}
                 animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.8, y: -50 }}
-                transition={{ duration: 0.3, ease: 'easeOut' }}
-                className="w-full"
+                exit={{ opacity: 0, scale: 0.9, y: -20 }}
+                transition={{
+                  type: 'spring',
+                  stiffness: 260,
+                  damping: 20,
+                }}
+                className="w-full max-w-md mx-auto"
               >
                 <GameCard
                   question={currentQuestion}

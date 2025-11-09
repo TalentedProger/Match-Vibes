@@ -1,7 +1,11 @@
+-- ============================================================
 -- Subcategories Migration for MatchVibe
+-- ============================================================
 -- Adds subcategory structure to existing categories
--- Version: 1.0.0
+-- Version: 2.0.0 (FIXED)
 -- Date: 2025-01-09
+-- Fix: Corrected UUID duplicate deletion method
+-- ============================================================
 
 -- ========================================
 -- 1. Create Subcategories Table
@@ -45,7 +49,43 @@ CREATE INDEX IF NOT EXISTS idx_questions_subcategory
 ON questions(subcategory_id);
 
 -- ========================================
--- 3. Insert Subcategories Data
+-- 3. Clean up existing duplicates
+-- ========================================
+
+DO $$
+DECLARE
+  deleted_count INTEGER;
+BEGIN
+  -- Delete duplicate subcategories, keeping only the oldest one
+  -- Using CTE with ROW_NUMBER() because MIN() doesn't work with UUID
+  WITH duplicates_cte AS (
+    SELECT 
+      id,
+      ROW_NUMBER() OVER (
+        PARTITION BY category_id, name 
+        ORDER BY created_at ASC, id
+      ) as row_num
+    FROM subcategories
+  )
+  DELETE FROM subcategories
+  WHERE id IN (
+    SELECT id FROM duplicates_cte WHERE row_num > 1
+  );
+  
+  GET DIAGNOSTICS deleted_count = ROW_COUNT;
+  RAISE NOTICE 'Deleted % duplicate subcategories', deleted_count;
+  
+  -- Now create unique constraint to prevent future duplicates
+  -- Must be created BEFORE inserts for ON CONFLICT to work
+  DROP INDEX IF EXISTS idx_subcategories_unique;
+  CREATE UNIQUE INDEX idx_subcategories_unique 
+  ON subcategories(category_id, name);
+  
+  RAISE NOTICE 'Unique index created - ready for inserts';
+END $$;
+
+-- ========================================
+-- 4. Insert Subcategories Data
 -- ========================================
 
 DO $$
@@ -111,7 +151,8 @@ BEGIN
 
   -- 🍕 Еда и напитки
   IF food_cat_id IS NOT NULL THEN
-    INSERT INTO subcategories (category_id, name, order_index) VALUES
+    INSERT INTO subcategories (category_id, name, order_index) 
+    VALUES
       (food_cat_id, 'Любимая кухня', 1),
       (food_cat_id, 'Любимое блюдо', 2),
       (food_cat_id, 'Кофе / чай', 3),
@@ -119,13 +160,14 @@ BEGIN
       (food_cat_id, 'Уличная еда', 5),
       (food_cat_id, 'Завтрак мечты', 6),
       (food_cat_id, 'Ресторан мечты', 7)
-    ON CONFLICT DO NOTHING;
-    RAISE NOTICE '✅ Food subcategories created';
+    ON CONFLICT (category_id, name) DO NOTHING;
+    RAISE NOTICE 'Food subcategories: 7 items';
   END IF;
 
   -- 🎬 Развлечения и культура
   IF entertainment_cat_id IS NOT NULL THEN
-    INSERT INTO subcategories (category_id, name, order_index) VALUES
+    INSERT INTO subcategories (category_id, name, order_index) 
+    VALUES
       (entertainment_cat_id, 'Любимый фильм', 1),
       (entertainment_cat_id, 'Любимый жанр кино', 2),
       (entertainment_cat_id, 'Любимый исполнитель', 3),
@@ -133,51 +175,54 @@ BEGIN
       (entertainment_cat_id, 'Сериал, который стоит пересмотреть', 5),
       (entertainment_cat_id, 'Любимая игра (настольная / видеоигра)', 6),
       (entertainment_cat_id, 'Самый вдохновляющий фильм', 7)
-    ON CONFLICT DO NOTHING;
-    RAISE NOTICE '✅ Entertainment subcategories created';
+    ON CONFLICT (category_id, name) DO NOTHING;
+    RAISE NOTICE 'Entertainment subcategories: 7 items';
   END IF;
 
   -- 🐶 Животные
   IF animals_cat_id IS NOT NULL THEN
-    INSERT INTO subcategories (category_id, name, order_index) VALUES
+    INSERT INTO subcategories (category_id, name, order_index) 
+    VALUES
       (animals_cat_id, 'Любимая порода собак', 1),
       (animals_cat_id, 'Кошки vs собаки', 2),
       (animals_cat_id, 'Идеальный питомец', 3),
       (animals_cat_id, 'Дикая природа или домашние любимцы', 4)
-    ON CONFLICT DO NOTHING;
-    RAISE NOTICE '✅ Animals subcategories created';
+    ON CONFLICT (category_id, name) DO NOTHING;
+    RAISE NOTICE 'Animals subcategories: 4 items';
   END IF;
 
   -- 💞 Отношения и личность
   IF relationships_cat_id IS NOT NULL THEN
-    INSERT INTO subcategories (category_id, name, order_index) VALUES
+    INSERT INTO subcategories (category_id, name, order_index) 
+    VALUES
       (relationships_cat_id, 'Главное качество в человеке', 1),
       (relationships_cat_id, 'Главный страх', 2),
       (relationships_cat_id, 'Заветная мечта', 3),
       (relationships_cat_id, 'Отношение к дружбе', 4),
       (relationships_cat_id, 'Как ты проявляешь заботу', 5),
       (relationships_cat_id, 'Любимый тип отдыха вдвоем', 6)
-    ON CONFLICT DO NOTHING;
-    RAISE NOTICE '✅ Relationships subcategories created';
+    ON CONFLICT (category_id, name) DO NOTHING;
+    RAISE NOTICE 'Relationships subcategories: 6 items';
   END IF;
 
   -- 🏖️ Досуг и путешествия
   IF leisure_cat_id IS NOT NULL THEN
-    INSERT INTO subcategories (category_id, name, order_index) VALUES
+    INSERT INTO subcategories (category_id, name, order_index) 
+    VALUES
       (leisure_cat_id, 'Любимое место отдыха', 1),
       (leisure_cat_id, 'Идеальное путешествие', 2),
       (leisure_cat_id, 'Активный отдых или релакс', 3),
       (leisure_cat_id, 'Город мечты', 4),
       (leisure_cat_id, 'Идеальный выходной', 5)
-    ON CONFLICT DO NOTHING;
-    RAISE NOTICE '✅ Leisure subcategories created';
+    ON CONFLICT (category_id, name) DO NOTHING;
+    RAISE NOTICE 'Leisure subcategories: 5 items';
   END IF;
 
   RAISE NOTICE '✅ Subcategories created successfully!';
 END $$;
 
 -- ========================================
--- 4. Verification
+-- 5. Verification
 -- ========================================
 
 -- Check subcategories count
