@@ -6,21 +6,17 @@
 import 'dotenv/config'
 
 const BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN
-const WEBHOOK_URL = `${process.env.NEXT_PUBLIC_APP_URL}/api/bot/webhook`
-const SECRET_TOKEN = process.env.TELEGRAM_WEBHOOK_SECRET
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '') // Remove trailing slash
+const WEBHOOK_URL = `${APP_URL}/api/bot/webhook`
 
 if (!BOT_TOKEN) {
   console.error('❌ TELEGRAM_BOT_TOKEN is not set')
   process.exit(1)
 }
 
-if (!WEBHOOK_URL) {
+if (!APP_URL) {
   console.error('❌ NEXT_PUBLIC_APP_URL is not set')
   process.exit(1)
-}
-
-if (!SECRET_TOKEN) {
-  console.warn('⚠️  TELEGRAM_WEBHOOK_SECRET is not set (not recommended)')
 }
 
 async function setWebhook() {
@@ -37,7 +33,6 @@ async function setWebhook() {
         },
         body: JSON.stringify({
           url: WEBHOOK_URL,
-          secret_token: SECRET_TOKEN,
           allowed_updates: ['message', 'callback_query', 'inline_query'],
           drop_pending_updates: true,
         }),
@@ -85,7 +80,7 @@ async function getWebhookInfo() {
 // Run
 setWebhook()
   .then(() => getWebhookInfo())
-  .catch((error) => {
+  .catch(error => {
     console.error('❌ Script failed:', error)
     process.exit(1)
   })

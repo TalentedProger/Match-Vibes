@@ -4,6 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev -p 3002",
+    "dev:bot": "tsx scripts/dev-bot.ts",
+    "dev:all": "concurrently \"pnpm dev\" \"pnpm dev:bot\" --names \"NEXT,BOT\" --prefix-colors \"cyan,magenta\"",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
@@ -12,7 +14,6 @@
     "test": "vitest",
     "test:ui": "vitest --ui",
     "prepare": "husky",
-    "bot:dev": "tsx watch scripts/bot-dev.ts",
     "bot:webhook": "tsx scripts/set-webhook.ts",
     "bot:menu": "tsx scripts/setup-menu-button.ts",
     "bot:check": "tsx scripts/check-token.ts"
@@ -45,6 +46,7 @@
     "@types/react": "^19.0.1",
     "@types/react-dom": "^19.0.2",
     "@vitejs/plugin-react": "^4.3.4",
+    "concurrently": "^9.1.0",
     "dotenv": "^17.2.3",
     "jsdom": "^25.0.1",
     "eslint": "^9.17.0",

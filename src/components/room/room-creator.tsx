@@ -9,9 +9,15 @@ interface RoomCreatorProps {
   isOpen: boolean
   onClose: () => void
   categoryId: string
+  subcategoryId?: string
 }
 
-export function RoomCreator({ isOpen, onClose, categoryId }: RoomCreatorProps) {
+export function RoomCreator({
+  isOpen,
+  onClose,
+  categoryId,
+  subcategoryId,
+}: RoomCreatorProps) {
   const router = useRouter()
   const { createRoom, isLoading } = useRoom()
   const [error, setError] = useState<string | null>(null)
@@ -20,13 +26,14 @@ export function RoomCreator({ isOpen, onClose, categoryId }: RoomCreatorProps) {
 
   const handleCreate = async () => {
     setError(null)
-    
+
     try {
       const room = await createRoom(categoryId)
       // Navigate to waiting room
       router.push(`/game/${room.id}/waiting`)
     } catch (err) {
-      const message = err instanceof Error ? err.message : 'Failed to create room'
+      const message =
+        err instanceof Error ? err.message : 'Failed to create room'
       setError(message)
     }
   }
@@ -36,9 +43,7 @@ export function RoomCreator({ isOpen, onClose, categoryId }: RoomCreatorProps) {
       <div className="bg-card rounded-2xl p-6 max-w-md w-full shadow-xl">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
-          <h3 className="text-xl font-bold text-foreground">
-            Создать комнату
-          </h3>
+          <h3 className="text-xl font-bold text-foreground">Создать комнату</h3>
           <button
             onClick={onClose}
             disabled={isLoading}
@@ -52,7 +57,8 @@ export function RoomCreator({ isOpen, onClose, categoryId }: RoomCreatorProps) {
         {/* Content */}
         <div className="space-y-4">
           <p className="text-muted-foreground">
-            Вы создадите комнату и получите ссылку-приглашение для отправки партнёру.
+            Вы создадите комнату и получите ссылку-приглашение для отправки
+            партнёру.
           </p>
 
           {error && (

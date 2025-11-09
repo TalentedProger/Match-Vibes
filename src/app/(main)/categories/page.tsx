@@ -1,24 +1,17 @@
 'use client'
 
-import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { AuthGuard } from '@/components/auth/auth-guard'
-import { RoomCreator } from '@/components/room/room-creator'
 import { useCategories } from '@/hooks/use-categories'
-import { Loader2 } from 'lucide-react'
+import { Loader2, ChevronRight } from 'lucide-react'
 
 export default function CategoriesPage() {
+  const router = useRouter()
   const { categories, isLoading, error } = useCategories()
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
-  const [isCreatorOpen, setIsCreatorOpen] = useState(false)
 
   const handleCategorySelect = (categoryId: string) => {
-    setSelectedCategory(categoryId)
-    setIsCreatorOpen(true)
-  }
-
-  const handleCloseCreator = () => {
-    setIsCreatorOpen(false)
-    setSelectedCategory(null)
+    // Navigate to subcategories page
+    router.push(`/categories/${categoryId}`)
   }
 
   return (
@@ -55,21 +48,21 @@ export default function CategoriesPage() {
               <button
                 key={category.id}
                 onClick={() => handleCategorySelect(category.id)}
-                className="group relative overflow-hidden bg-card rounded-2xl p-6 text-left hover:shadow-lg transition-all active:scale-95"
+                className="group relative overflow-hidden bg-card rounded-2xl p-6 text-left hover:shadow-lg transition-all active:scale-95 flex items-center justify-between"
               >
                 {/* Gradient overlay on hover */}
                 {category.color && (
                   <div
                     className="absolute inset-0 opacity-0 group-hover:opacity-10 transition-opacity"
                     style={{
-                      background: category.color.includes('gradient')
+                      background: category.color?.includes('gradient')
                         ? category.color
                         : `linear-gradient(135deg, ${category.color}, ${category.color})`,
                     }}
                   />
                 )}
 
-                <div className="relative">
+                <div className="relative flex-1">
                   {/* Icon */}
                   <div
                     className="inline-flex items-center justify-center w-12 h-12 rounded-xl mb-3 text-2xl"
@@ -92,6 +85,9 @@ export default function CategoriesPage() {
                     </p>
                   )}
                 </div>
+
+                {/* Chevron icon */}
+                <ChevronRight className="w-6 h-6 text-muted-foreground group-hover:text-foreground transition-colors" />
               </button>
             ))}
           </div>
@@ -106,15 +102,6 @@ export default function CategoriesPage() {
           </div>
         )}
       </div>
-
-      {/* Room Creator Modal */}
-      {selectedCategory && (
-        <RoomCreator
-          isOpen={isCreatorOpen}
-          onClose={handleCloseCreator}
-          categoryId={selectedCategory}
-        />
-      )}
     </AuthGuard>
   )
 }

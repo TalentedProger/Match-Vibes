@@ -82,10 +82,46 @@ export interface Database {
           created_at?: string
         }
       }
+      subcategories: {
+        Row: {
+          id: string
+          category_id: string
+          name: string
+          description: string | null
+          icon: string | null
+          order_index: number
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          category_id: string
+          name: string
+          description?: string | null
+          icon?: string | null
+          order_index?: number
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          category_id?: string
+          name?: string
+          description?: string | null
+          icon?: string | null
+          order_index?: number
+          is_active?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+      }
       questions: {
         Row: {
           id: string
           category_id: string
+          subcategory_id: string | null
           text: string
           image_url: string
           order_index: number
@@ -95,6 +131,7 @@ export interface Database {
         Insert: {
           id?: string
           category_id: string
+          subcategory_id?: string | null
           text: string
           image_url: string
           order_index?: number
@@ -104,6 +141,7 @@ export interface Database {
         Update: {
           id?: string
           category_id?: string
+          subcategory_id?: string | null
           text?: string
           image_url?: string
           order_index?: number
