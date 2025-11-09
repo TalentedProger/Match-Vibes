@@ -6,6 +6,20 @@ import { handleStatsCommand } from './commands/stats'
 import { handleProfileCommand } from './commands/profile'
 
 let botInstance: Bot | null = null
+let botInitPromise: Promise<void> | null = null
+
+/**
+ * Initialize bot (fetch bot info from Telegram)
+ * This is called once when bot is first accessed
+ */
+async function initializeBot(bot: Bot): Promise<void> {
+  if (!botInitPromise) {
+    botInitPromise = bot.init().then(() => {
+      console.log('Bot info fetched successfully')
+    })
+  }
+  return botInitPromise
+}
 
 /**
  * Get or create bot instance (lazy initialization)
@@ -20,7 +34,7 @@ export function getBot(): Bot {
       throw new Error('TELEGRAM_BOT_TOKEN is not set')
     }
 
-    console.log('Initializing bot instance...')
+    console.log('Creating bot instance...')
     botInstance = new Bot(token)
 
     // Register commands
@@ -36,10 +50,20 @@ export function getBot(): Bot {
       console.error('Bot command error:', err)
     })
 
-    console.log('Bot initialized successfully')
+    console.log('Bot instance created successfully')
   }
 
   return botInstance
+}
+
+/**
+ * Get bot instance and ensure it's initialized
+ * Use this in webhook handler
+ */
+export async function getBotInitialized(): Promise<Bot> {
+  const bot = getBot()
+  await initializeBot(bot)
+  return bot
 }
 
 // Default export

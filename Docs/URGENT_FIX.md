@@ -1,8 +1,8 @@
 # СРОЧНОЕ ИСПРАВЛЕНИЕ БОТА
 
-**Проблема:** `TypeError: Cannot read properties of undefined (reading 'get')`
+**Проблема:** `Bot not initialized! Either call 'await bot.init()'`
 
-**Статус:** ✅ КОД ИСПРАВЛЕН
+**Статус:** ✅ КОД ПОЛНОСТЬЮ ИСПРАВЛЕН
 
 ---
 
@@ -12,7 +12,7 @@
 
 ```bash
 git add .
-git commit -m "Fix bot webhook TypeError"
+git commit -m "Fix: Bot initialization before handling updates"
 git push origin main
 ```
 
@@ -57,33 +57,53 @@ pnpm bot:webhook
 
 ## ✅ Что было исправлено
 
+### В файле `src/bot/index.ts`:
+
+**Добавлена функция инициализации:**
+
+```typescript
+// ✅ НОВОЕ
+export async function getBotInitialized(): Promise<Bot> {
+  const bot = getBot()
+  await initializeBot(bot) // Инициализирует бота
+  return bot
+}
+```
+
+**Что делает:**
+
+- Создает бота один раз
+- Инициализирует его через `bot.init()`
+- Кеширует Promise чтобы не вызывать init дважды
+
 ### В файле `src/app/api/bot/webhook/route.ts`:
 
 **Было (неправильно):**
 
 ```typescript
-const handler = webhookCallback(bot, 'std/http')
-await handler(update) // ❌ Ошибка здесь
+const bot = getBot()
+await bot.handleUpdate(update) // ❌ Бот не инициализирован!
 ```
 
 **Стало (правильно):**
 
 ```typescript
-await bot.handleUpdate(update) // ✅ Работает
+const bot = await getBotInitialized() // ✅ Инициализирован
+await bot.handleUpdate(update)
 ```
 
 ### Добавлено логирование:
-
-- В `src/bot/index.ts` - логи инициализации бота
-- В `src/app/api/bot/webhook/route.ts` - логи обработки запросов
 
 Теперь в Vercel Logs вы увидите:
 
 ```
 Webhook POST received
 Received update from Telegram: {...}
-Initializing bot instance...
-Bot initialized successfully
+Getting bot instance...
+Creating bot instance...
+Registering bot commands...
+Bot instance created successfully
+Bot info fetched successfully  ← ✅ НОВОЕ!
 Processing update with bot...
 Update processed successfully
 ```
@@ -185,6 +205,7 @@ curl https://matchvibesmain.vercel.app/api/bot/webhook
 
 ## 📚 Подробная информация
 
+- **`Docs/Bot_Init_Fix.md`** - подробное описание исправления (читайте!)
 - `Docs/Bot_Webhook_Debug.md` - полное руководство по отладке
 - `Docs/Bot_Server_Setup.md` - как работает webhook
 - `Docs/FIXES_SUMMARY.md` - все исправления

@@ -5,11 +5,13 @@
  * Usage: pnpm dev:bot
  */
 
-import bot from '../src/bot'
+import { getBot } from '../src/bot'
 
 console.log('🤖 Starting Telegram Bot in polling mode...')
 console.log('⚠️  Development only! Production uses webhook automatically.')
 console.log('')
+
+const bot = getBot()
 
 // Delete webhook to enable polling
 bot.api
@@ -17,7 +19,7 @@ bot.api
   .then(() => {
     console.log('✅ Webhook deleted (polling mode enabled)')
 
-    // Start bot
+    // Start bot (this will auto-initialize)
     bot.start({
       onStart: botInfo => {
         console.log('✅ Bot started successfully!')

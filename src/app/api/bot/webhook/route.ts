@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getBot } from '@/bot'
+import { getBotInitialized } from '@/bot'
 
 /**
  * Verify webhook secret token
@@ -44,8 +44,9 @@ export async function POST(request: NextRequest) {
         update.message?.from?.username || update.callback_query?.from?.username,
     })
 
-    // Get bot instance
-    const bot = getBot()
+    // Get bot instance and ensure it's initialized
+    console.log('Getting bot instance...')
+    const bot = await getBotInitialized()
 
     // Handle the update
     console.log('Processing update with bot...')
