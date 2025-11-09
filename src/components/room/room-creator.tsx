@@ -28,7 +28,7 @@ export function RoomCreator({
     setError(null)
 
     try {
-      const room = await createRoom(categoryId)
+      const room = await createRoom(categoryId, subcategoryId)
       // Navigate to waiting room
       router.push(`/game/${room.id}/waiting`)
     } catch (err) {

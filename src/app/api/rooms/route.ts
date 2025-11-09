@@ -5,7 +5,7 @@ import { nanoid } from 'nanoid'
 // POST /api/rooms - Create a new room
 export async function POST(request: NextRequest) {
   try {
-    const { categoryId, userId } = await request.json()
+    const { categoryId, userId, subcategoryId } = await request.json()
 
     if (!categoryId || !userId) {
       return NextResponse.json(
@@ -19,15 +19,22 @@ export async function POST(request: NextRequest) {
     // Generate unique invitation code
     const invitationCode = nanoid(10)
 
+    // Create room with optional subcategory
+    const roomData: any = {
+      host_id: userId,
+      category_id: categoryId,
+      status: 'waiting',
+      invitation_code: invitationCode,
+    }
+
+    if (subcategoryId) {
+      roomData.subcategory_id = subcategoryId
+    }
+
     // Create room
     const { data: room, error } = await (supabase as any)
       .from('rooms')
-      .insert({
-        host_id: userId,
-        category_id: categoryId,
-        status: 'waiting',
-        invitation_code: invitationCode,
-      })
+      .insert(roomData)
       .select()
       .single()
 

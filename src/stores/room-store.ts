@@ -8,14 +8,18 @@ interface RoomState {
   isLoading: boolean
   error: string | null
   invitationCode: string | null
-  
+
   // Actions
   setRoom: (room: Room | null) => void
   setIsHost: (isHost: boolean) => void
   setLoading: (loading: boolean) => void
   setError: (error: string | null) => void
   setInvitationCode: (code: string | null) => void
-  createRoom: (categoryId: string, userId: string) => Promise<Room>
+  createRoom: (
+    categoryId: string,
+    userId: string,
+    subcategoryId?: string
+  ) => Promise<Room>
   joinRoom: (invitationCode: string, userId: string) => Promise<Room>
   leaveRoom: () => void
   refreshRoom: (roomId: string) => Promise<void>
@@ -31,17 +35,21 @@ export const useRoomStore = create<RoomState>()(
       error: null,
       invitationCode: null,
 
-      setRoom: (room) => set({ currentRoom: room, error: null }),
-      
-      setIsHost: (isHost) => set({ isHost }),
-      
-      setLoading: (loading) => set({ isLoading: loading }),
-      
-      setError: (error) => set({ error }),
-      
-      setInvitationCode: (code) => set({ invitationCode: code }),
+      setRoom: room => set({ currentRoom: room, error: null }),
 
-      createRoom: async (categoryId: string, userId: string) => {
+      setIsHost: isHost => set({ isHost }),
+
+      setLoading: loading => set({ isLoading: loading }),
+
+      setError: error => set({ error }),
+
+      setInvitationCode: code => set({ invitationCode: code }),
+
+      createRoom: async (
+        categoryId: string,
+        userId: string,
+        subcategoryId?: string
+      ) => {
         set({ isLoading: true, error: null })
 
         try {
@@ -50,7 +58,7 @@ export const useRoomStore = create<RoomState>()(
             headers: {
               'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ categoryId, userId }),
+            body: JSON.stringify({ categoryId, userId, subcategoryId }),
           })
 
           if (!response.ok) {
@@ -59,7 +67,7 @@ export const useRoomStore = create<RoomState>()(
           }
 
           const { room } = await response.json()
-          
+
           set({
             currentRoom: room,
             isHost: true,
@@ -70,7 +78,8 @@ export const useRoomStore = create<RoomState>()(
 
           return room
         } catch (error) {
-          const message = error instanceof Error ? error.message : 'Unknown error'
+          const message =
+            error instanceof Error ? error.message : 'Unknown error'
           set({
             currentRoom: null,
             isHost: false,
@@ -99,7 +108,7 @@ export const useRoomStore = create<RoomState>()(
           }
 
           const { room } = await response.json()
-          
+
           set({
             currentRoom: room,
             isHost: false,
@@ -110,7 +119,8 @@ export const useRoomStore = create<RoomState>()(
 
           return room
         } catch (error) {
-          const message = error instanceof Error ? error.message : 'Unknown error'
+          const message =
+            error instanceof Error ? error.message : 'Unknown error'
           set({
             currentRoom: null,
             isHost: false,
@@ -133,7 +143,7 @@ export const useRoomStore = create<RoomState>()(
       refreshRoom: async (roomId: string) => {
         try {
           const response = await fetch(`/api/rooms/${roomId}`)
-          
+
           if (!response.ok) {
             throw new Error('Failed to refresh room')
           }
@@ -157,7 +167,7 @@ export const useRoomStore = create<RoomState>()(
     }),
     {
       name: 'room-storage',
-      partialize: (state) => ({
+      partialize: state => ({
         currentRoom: state.currentRoom,
         isHost: state.isHost,
         invitationCode: state.invitationCode,

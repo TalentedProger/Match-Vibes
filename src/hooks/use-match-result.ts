@@ -73,7 +73,8 @@ export function useMatchResult(roomId: string | null): UseMatchResultReturn {
         throw new Error(data.error || 'Failed to fetch result')
       }
 
-      setResult(data.result)
+      // Handle case where result is null (not calculated yet)
+      setResult(data.result || null)
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error'
       setError(errorMessage)

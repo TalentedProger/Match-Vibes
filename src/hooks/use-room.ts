@@ -33,12 +33,12 @@ export function useRoom() {
   }, [currentRoom, refreshRoom])
 
   const handleCreateRoom = useCallback(
-    async (categoryId: string) => {
+    async (categoryId: string, subcategoryId?: string) => {
       if (!user) {
         throw new Error('User not authenticated')
       }
 
-      return await createRoom(categoryId, user.id)
+      return await createRoom(categoryId, user.id, subcategoryId)
     },
     [user, createRoom]
   )

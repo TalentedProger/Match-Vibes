@@ -3,6 +3,7 @@ export interface Room {
   host_id: string
   guest_id: string | null
   category_id: string
+  subcategory_id?: string | null
   status: 'waiting' | 'ready' | 'playing' | 'completed' | 'cancelled'
   invitation_code: string
   created_at: string

@@ -53,9 +53,13 @@ export default function GamePage() {
 
       setLoading(true)
       try {
-        const response = await fetch(
-          `/api/categories/${currentRoom.category_id}/questions`
-        )
+        // Build URL with optional subcategory filter
+        let url = `/api/categories/${currentRoom.category_id}/questions`
+        if (currentRoom.subcategory_id) {
+          url += `?subcategoryId=${currentRoom.subcategory_id}`
+        }
+
+        const response = await fetch(url)
 
         if (!response.ok) {
           throw new Error('Failed to fetch questions')

@@ -71,13 +71,21 @@ export async function POST(
       )
     }
 
-    // 2. Fetch all questions for this category
-    const { data: questions, error: questionsError } = await supabase
+    // 2. Fetch all questions for this category/subcategory
+    let questionsQuery = supabase
       .from('questions')
       .select('*')
-      .eq('category_id', room.category_id)
       .eq('is_active', true)
-      .order('order_index', { ascending: true })
+
+    // Filter by subcategory if present, otherwise by category
+    if (room.subcategory_id) {
+      questionsQuery = questionsQuery.eq('subcategory_id', room.subcategory_id)
+    } else {
+      questionsQuery = questionsQuery.eq('category_id', room.category_id)
+    }
+
+    const { data: questions, error: questionsError } =
+      await questionsQuery.order('order_index', { ascending: true })
 
     if (questionsError || !questions || questions.length === 0) {
       return NextResponse.json(
@@ -230,10 +238,22 @@ export async function GET(
       .from('results')
       .select('*')
       .eq('room_id', roomId)
-      .single()
+      .maybeSingle()
 
-    if (error || !result) {
-      return NextResponse.json({ error: 'Result not found' }, { status: 404 })
+    if (error) {
+      console.error('Error fetching result:', error)
+      return NextResponse.json(
+        { error: 'Failed to fetch result' },
+        { status: 500 }
+      )
+    }
+
+    if (!result) {
+      // Result doesn't exist yet - return null instead of 404
+      return NextResponse.json({
+        result: null,
+        message: 'Result not calculated yet',
+      })
     }
 
     return NextResponse.json({
