@@ -72,16 +72,29 @@ export async function POST(
     }
 
     // 2. Fetch all questions for this category/subcategory
-    let questionsQuery = supabase
-      .from('questions')
-      .select('*')
-      .eq('is_active', true)
+    let questionsQuery
 
-    // Filter by subcategory if present, otherwise by category
     if (room.subcategory_id) {
-      questionsQuery = questionsQuery.eq('subcategory_id', room.subcategory_id)
+      // Filter by specific subcategory
+      questionsQuery = supabase
+        .from('questions')
+        .select('*')
+        .eq('subcategory_id', room.subcategory_id)
+        .eq('is_active', true)
     } else {
-      questionsQuery = questionsQuery.eq('category_id', room.category_id)
+      // Get all questions from all subcategories of this category
+      const { data: subcategories } = await supabase
+        .from('subcategories')
+        .select('id')
+        .eq('category_id', room.category_id)
+
+      const subcategoryIds = subcategories?.map(s => s.id) || []
+
+      questionsQuery = supabase
+        .from('questions')
+        .select('*')
+        .in('subcategory_id', subcategoryIds)
+        .eq('is_active', true)
     }
 
     const { data: questions, error: questionsError } =

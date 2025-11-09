@@ -27,17 +27,30 @@ export async function GET(
 
     const supabase = await createClient()
 
-    // Build query
-    let query = supabase
-      .from('questions')
-      .select('id, text, image_url, order_index, subcategory_id')
-      .eq('is_active', true)
+    // Build query based on whether subcategoryId is provided
+    let query
 
-    // Filter by subcategory if provided, otherwise by category
     if (subcategoryId) {
-      query = query.eq('subcategory_id', subcategoryId)
+      // Filter by specific subcategory
+      query = supabase
+        .from('questions')
+        .select('id, text, image_url, order_index, subcategory_id')
+        .eq('subcategory_id', subcategoryId)
+        .eq('is_active', true)
     } else {
-      query = query.eq('category_id', categoryId)
+      // Get all questions from all subcategories of this category
+      const { data: subcategories } = await supabase
+        .from('subcategories')
+        .select('id')
+        .eq('category_id', categoryId)
+
+      const subcategoryIds = subcategories?.map(s => s.id) || []
+
+      query = supabase
+        .from('questions')
+        .select('id, text, image_url, order_index, subcategory_id')
+        .in('subcategory_id', subcategoryIds)
+        .eq('is_active', true)
     }
 
     // Fetch questions
@@ -53,14 +66,11 @@ export async function GET(
       )
     }
 
-    if (!questions || questions.length === 0) {
-      return NextResponse.json(
-        { error: 'No questions found for this category' },
-        { status: 404 }
-      )
-    }
-
-    return NextResponse.json({ questions })
+    // Return questions even if empty array (let frontend handle it)
+    return NextResponse.json({
+      questions: questions || [],
+      count: questions?.length || 0,
+    })
   } catch (error) {
     console.error('Unexpected error:', error)
     return NextResponse.json(

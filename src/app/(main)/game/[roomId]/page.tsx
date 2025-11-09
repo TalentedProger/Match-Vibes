@@ -67,6 +67,12 @@ export default function GamePage() {
 
         const data = await response.json()
 
+        // Check if questions exist
+        if (!data.questions || data.questions.length === 0) {
+          setError('Нет доступных вопросов для этой категории')
+          return
+        }
+
         // Remove any potential duplicates from questions
         const uniqueQuestions = data.questions.filter(
           (q: Question, index: number, self: Question[]) =>
