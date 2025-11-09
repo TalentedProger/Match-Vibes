@@ -17,6 +17,7 @@ export default function ResultPage() {
     useMatchResult(roomId)
   const [categoryName, setCategoryName] = useState<string>('Категория')
   const [isCalculating, setIsCalculating] = useState(false)
+  const [calculationAttempted, setCalculationAttempted] = useState(false)
 
   // Fetch category name
   useEffect(() => {
@@ -38,18 +39,39 @@ export default function ResultPage() {
     fetchCategory()
   }, [result?.category_id])
 
-  // Auto-calculate if no result exists
+  // Auto-calculate if no result exists (with delay to ensure both players finished)
   useEffect(() => {
     async function autoCalculate() {
-      if (!isLoading && !result && !error && !isCalculating) {
+      if (
+        !isLoading &&
+        !result &&
+        !error &&
+        !isCalculating &&
+        !calculationAttempted
+      ) {
+        setCalculationAttempted(true)
+        // Add small delay to ensure both players have finished submitting
+        await new Promise(resolve => setTimeout(resolve, 1500))
         setIsCalculating(true)
-        await calculateMatch()
-        setIsCalculating(false)
+        try {
+          await calculateMatch()
+        } catch (err) {
+          console.error('Calculation failed:', err)
+        } finally {
+          setIsCalculating(false)
+        }
       }
     }
 
     autoCalculate()
-  }, [isLoading, result, error, calculateMatch, isCalculating])
+  }, [
+    isLoading,
+    result,
+    error,
+    calculateMatch,
+    isCalculating,
+    calculationAttempted,
+  ])
 
   const handlePlayAgain = () => {
     router.push('/categories')

@@ -38,24 +38,22 @@ export async function POST(
       return NextResponse.json({ error: 'Room not found' }, { status: 404 })
     }
 
-    // Check if room is in correct state
-    if (room.status === 'completed') {
-      // Already calculated, fetch existing result
-      const { data: existingResult } = await supabase
-        .from('results')
-        .select('*')
-        .eq('room_id', roomId)
-        .single()
+    // Check if result already exists (prevent duplicate calculations)
+    const { data: existingResult } = await supabase
+      .from('results')
+      .select('*')
+      .eq('room_id', roomId)
+      .maybeSingle()
 
-      if (existingResult) {
-        return NextResponse.json({
-          message: 'Result already calculated',
-          result: existingResult,
-          cached: true,
-        })
-      }
+    if (existingResult) {
+      return NextResponse.json({
+        message: 'Result already calculated',
+        result: existingResult,
+        cached: true,
+      })
     }
 
+    // Only allow calculation when room is playing or completed
     if (room.status !== 'playing' && room.status !== 'completed') {
       return NextResponse.json(
         { error: `Room is not ready for calculation (status: ${room.status})` },
@@ -127,6 +125,23 @@ export async function POST(
     const guestResponses = (allResponses || []).filter(
       r => r.user_id === room.guest_id
     )
+
+    // Check if both players have completed all questions
+    const expectedCount = questions.length
+    if (
+      hostResponses.length < expectedCount ||
+      guestResponses.length < expectedCount
+    ) {
+      return NextResponse.json(
+        {
+          error: 'Both players must complete all questions before calculation',
+          hostCount: hostResponses.length,
+          guestCount: guestResponses.length,
+          expectedCount: expectedCount,
+        },
+        { status: 400 }
+      )
+    }
 
     // 4. Validate responses
     const validation = validateResponses(

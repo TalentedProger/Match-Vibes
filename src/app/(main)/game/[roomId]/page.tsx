@@ -9,8 +9,6 @@ import { useGameStore } from '@/stores/game-store'
 import { useTimer } from '@/hooks/use-timer'
 import { useGameRealtime } from '@/hooks/use-game-realtime'
 import { GameCard } from '@/components/game/game-card'
-import { Timer } from '@/components/game/timer'
-import { ProgressBar } from '@/components/game/progress-bar'
 import { PartnerProgress } from '@/components/game/partner-progress'
 import { Loader2 } from 'lucide-react'
 import type { Question } from '@/types/game'
@@ -190,35 +188,34 @@ export default function GamePage() {
   return (
     <AuthGuard>
       <div className="min-h-screen flex flex-col bg-background">
-        {/* Header with Progress and Timer */}
-        <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-lg border-b border-border">
-          <div className="container max-w-2xl mx-auto px-4 py-4 space-y-3">
-            {/* User Progress and Timer */}
-            <div className="flex items-center justify-between">
-              {/* Progress Bar */}
-              <ProgressBar
-                current={currentQuestionIndex}
-                total={questions.length}
-                className="flex-1 mr-4"
-              />
-
-              {/* Timer */}
-              <Timer timeRemaining={timeRemaining} totalTime={20} />
-            </div>
-
-            {/* Partner Progress */}
-            {currentRoom?.guest_id && (
+        {/* Partner Progress (sticky at top) */}
+        {currentRoom?.guest_id && (
+          <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-lg border-b border-border">
+            <div className="container max-w-2xl mx-auto px-4 py-3">
               <PartnerProgress
                 progress={partnerProgress}
                 total={questions.length}
                 isActive={isPartnerActive}
               />
-            )}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Main Game Area */}
-        <div className="flex-1 flex items-center justify-center px-4 py-8">
+        <div className="flex-1 flex flex-col items-center justify-center px-4 py-4">
+          {/* Question Counter and Timer Header */}
+          <div className="w-full max-w-sm mx-auto mb-4 flex items-center justify-between px-2">
+            <div className="text-sm font-medium text-muted-foreground">
+              Вопрос: {currentQuestionIndex + 1}/{questions.length}
+            </div>
+            <div className="text-sm font-medium text-muted-foreground">
+              Время:{' '}
+              <span className="text-foreground font-bold">
+                {timeRemaining}сек
+              </span>
+            </div>
+          </div>
+          {/* Card */}
           <AnimatePresence mode="wait">
             {currentQuestion ? (
               <motion.div
@@ -231,7 +228,7 @@ export default function GamePage() {
                   stiffness: 260,
                   damping: 20,
                 }}
-                className="w-full max-w-md mx-auto"
+                className="w-full max-w-sm mx-auto"
               >
                 <GameCard
                   question={currentQuestion}
@@ -245,13 +242,6 @@ export default function GamePage() {
               </div>
             )}
           </AnimatePresence>
-        </div>
-
-        {/* Question Counter */}
-        <div className="fixed bottom-8 left-0 right-0 text-center">
-          <p className="text-sm text-muted-foreground">
-            Вопрос {currentQuestionIndex + 1} из {questions.length}
-          </p>
         </div>
       </div>
     </AuthGuard>

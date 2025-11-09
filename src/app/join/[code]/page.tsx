@@ -14,12 +14,16 @@ export default function JoinPage() {
   const { isAuthenticated, isLoading: authLoading } = useAuth()
   const { joinRoom, isLoading: roomLoading } = useRoom()
   const [error, setError] = useState<string | null>(null)
+  const [isJoining, setIsJoining] = useState(false)
 
   useEffect(() => {
     const handleJoin = async () => {
       // Wait for authentication
       if (authLoading) return
-      
+
+      // Prevent double join attempts
+      if (isJoining) return
+
       if (!isAuthenticated) {
         setError('Требуется аутентификация')
         return
@@ -30,20 +34,25 @@ export default function JoinPage() {
         return
       }
 
+      setIsJoining(true)
       try {
         const room = await joinRoom(code)
         // Navigate to waiting room
         router.push(`/game/${room.id}/waiting`)
       } catch (err) {
-        const message = err instanceof Error ? err.message : 'Не удалось присоединиться к комнате'
+        const message =
+          err instanceof Error
+            ? err.message
+            : 'Не удалось присоединиться к комнате'
         setError(message)
+        setIsJoining(false)
       }
     }
 
     handleJoin()
-  }, [code, isAuthenticated, authLoading, joinRoom, router])
+  }, [code, isAuthenticated, authLoading, joinRoom, router, isJoining])
 
-  if (authLoading || roomLoading) {
+  if (authLoading || roomLoading || isJoining) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center space-y-4">
@@ -61,7 +70,7 @@ export default function JoinPage() {
           <div className="inline-flex items-center justify-center w-16 h-16 bg-red-500/10 rounded-full">
             <AlertCircle className="h-8 w-8 text-red-500" />
           </div>
-          
+
           <div className="space-y-2">
             <h1 className="text-2xl font-bold text-foreground">
               Не удалось присоединиться

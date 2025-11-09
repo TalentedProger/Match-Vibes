@@ -53,7 +53,7 @@ export function GameCard({
 
   return (
     <motion.div
-      className="relative w-full max-w-md mx-auto"
+      className="relative w-full max-w-sm mx-auto"
       style={{
         x,
         rotate,
@@ -79,7 +79,7 @@ export function GameCard({
       {/* Card */}
       <div className="relative aspect-[3/4] bg-card rounded-3xl shadow-2xl overflow-hidden border border-border">
         {/* Image */}
-        <div className="relative h-3/5 bg-gradient-to-br from-primary/10 to-secondary/10">
+        <div className="relative h-2/3 bg-gradient-to-br from-primary/10 to-secondary/10">
           {question.image_url ? (
             <img
               src={question.image_url}
@@ -94,9 +94,11 @@ export function GameCard({
           )}
         </div>
 
-        {/* Text */}
-        <div className="h-2/5 p-6 flex flex-col items-center justify-center">
-          <h2 className="text-2xl font-bold text-center">{question.text}</h2>
+        {/* Text Container - Compact Gray Background */}
+        <div className="absolute bottom-0 left-0 right-0 mx-4 mb-4 bg-muted/90 backdrop-blur-sm rounded-2xl px-4 py-3">
+          <h2 className="text-xl font-bold text-center leading-tight">
+            {question.text}
+          </h2>
         </div>
 
         {/* Swipe Indicators */}
