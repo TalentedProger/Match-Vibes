@@ -53,7 +53,7 @@ export function GameCard({
 
   return (
     <motion.div
-      className="relative w-full max-w-sm mx-auto"
+      className="relative w-full max-w-[340px] mx-auto"
       style={{
         x,
         rotate,
@@ -77,9 +77,9 @@ export function GameCard({
       whileTap={{ cursor: 'grabbing' }}
     >
       {/* Card */}
-      <div className="relative aspect-[3/4] bg-card rounded-3xl shadow-2xl overflow-hidden border border-border">
-        {/* Image */}
-        <div className="relative h-2/3 bg-gradient-to-br from-primary/10 to-secondary/10">
+      <div className="relative aspect-[3/4.2] bg-card rounded-3xl shadow-2xl overflow-hidden border border-border">
+        {/* Image - Full Height */}
+        <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-secondary/10">
           {question.image_url ? (
             <img
               src={question.image_url}
@@ -94,8 +94,8 @@ export function GameCard({
           )}
         </div>
 
-        {/* Text Container - Compact Gray Background */}
-        <div className="absolute bottom-0 left-0 right-0 mx-4 mb-4 bg-muted/90 backdrop-blur-sm rounded-2xl px-4 py-3">
+        {/* Text Container - Semi-transparent overlay */}
+        <div className="absolute bottom-0 left-0 right-0 mx-3 mb-3 bg-background/75 backdrop-blur-md rounded-2xl px-4 py-3 shadow-lg border border-border/50">
           <h2 className="text-xl font-bold text-center leading-tight">
             {question.text}
           </h2>
@@ -106,21 +106,21 @@ export function GameCard({
           <>
             {/* Like Indicator */}
             <motion.div
-              className="absolute top-8 right-8 pointer-events-none"
+              className="absolute top-6 right-6 pointer-events-none"
               style={{ opacity: likeOpacity }}
             >
-              <div className="flex items-center justify-center w-20 h-20 rounded-full bg-green-500/90 border-4 border-white shadow-lg">
-                <Heart className="w-10 h-10 text-white fill-white" />
+              <div className="flex items-center justify-center w-16 h-16 rounded-full bg-green-500/90 border-3 border-white shadow-lg">
+                <Heart className="w-8 h-8 text-white fill-white" />
               </div>
             </motion.div>
 
             {/* Dislike Indicator */}
             <motion.div
-              className="absolute top-8 left-8 pointer-events-none"
+              className="absolute top-6 left-6 pointer-events-none"
               style={{ opacity: dislikeOpacity }}
             >
-              <div className="flex items-center justify-center w-20 h-20 rounded-full bg-red-500/90 border-4 border-white shadow-lg">
-                <X className="w-10 h-10 text-white" strokeWidth={3} />
+              <div className="flex items-center justify-center w-16 h-16 rounded-full bg-red-500/90 border-3 border-white shadow-lg">
+                <X className="w-8 h-8 text-white" strokeWidth={3} />
               </div>
             </motion.div>
           </>

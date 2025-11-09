@@ -11,11 +11,6 @@ const navItems = [
     icon: Home,
   },
   {
-    name: 'Профиль',
-    href: '/profile',
-    icon: User,
-  },
-  {
     name: 'Статистика',
     href: '/stats',
     icon: BarChart3,
@@ -25,6 +20,11 @@ const navItems = [
     href: '/achievements',
     icon: Trophy,
   },
+  {
+    name: 'Профиль',
+    href: '/profile',
+    icon: User,
+  },
 ]
 
 export function BottomNav() {
@@ -33,7 +33,7 @@ export function BottomNav() {
   return (
     <nav className="fixed bottom-0 left-0 right-0 z-50 bg-card border-t border-border safe-area-inset-bottom">
       <div className="grid grid-cols-4 h-16">
-        {navItems.map((item) => {
+        {navItems.map(item => {
           const isActive = pathname === item.href
           const Icon = item.icon
 

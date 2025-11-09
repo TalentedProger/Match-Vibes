@@ -68,15 +68,15 @@ export default function SubcategoriesPage() {
 
   return (
     <AuthGuard>
-      <div className="container max-w-2xl mx-auto px-4 py-6 min-h-screen">
+      <div className="container max-w-2xl mx-auto px-4 py-4 min-h-screen">
         {/* Header */}
-        <div className="mb-6">
+        <div className="mb-8">
           <button
             onClick={() => router.back()}
-            className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors mb-4"
+            className="flex items-center gap-2 text-muted-foreground hover:text-foreground transition-colors border border-border rounded-lg px-3 py-2 mb-6"
           >
-            <ArrowLeft className="w-5 h-5" />
-            <span>Назад</span>
+            <ArrowLeft className="w-4 h-4" />
+            <span className="text-sm">Назад</span>
           </button>
 
           {category && (
@@ -90,7 +90,7 @@ export default function SubcategoriesPage() {
                 {category.icon || '📦'}
               </div>
               <div>
-                <h1 className="text-3xl font-bold text-foreground">
+                <h1 className="text-2xl font-bold text-foreground">
                   {category.name}
                 </h1>
                 {category.description && (

@@ -10,7 +10,7 @@ import { useTimer } from '@/hooks/use-timer'
 import { useGameRealtime } from '@/hooks/use-game-realtime'
 import { GameCard } from '@/components/game/game-card'
 import { PartnerProgress } from '@/components/game/partner-progress'
-import { Loader2 } from 'lucide-react'
+import { Loader2, MessageCircleQuestion, Clock } from 'lucide-react'
 import type { Question } from '@/types/game'
 import { motion, AnimatePresence } from 'framer-motion'
 
@@ -202,16 +202,24 @@ export default function GamePage() {
         )}
 
         {/* Main Game Area */}
-        <div className="flex-1 flex flex-col items-center justify-center px-4 py-4">
+        <div className="flex-1 flex flex-col items-center justify-center px-4 pt-2">
           {/* Question Counter and Timer Header */}
-          <div className="w-full max-w-sm mx-auto mb-4 flex items-center justify-between px-2">
-            <div className="text-sm font-medium text-muted-foreground">
-              Вопрос: {currentQuestionIndex + 1}/{questions.length}
+          <div className="w-full max-w-sm mx-auto mb-6 flex items-center justify-between px-2">
+            <div className="flex items-center gap-2">
+              <MessageCircleQuestion className="w-5 h-5 text-primary" />
+              <span className="text-base font-semibold text-foreground">
+                Вопрос:{' '}
+                <span className="text-primary">{currentQuestionIndex + 1}</span>
+                /{questions.length}
+              </span>
             </div>
-            <div className="text-sm font-medium text-muted-foreground">
-              Время:{' '}
-              <span className="text-foreground font-bold">
-                {timeRemaining}сек
+            <div className="flex items-center gap-2">
+              <Clock className="w-5 h-5 text-primary" />
+              <span className="text-base font-semibold text-foreground">
+                Время:{' '}
+                <span className="text-primary font-bold">
+                  {timeRemaining}сек
+                </span>
               </span>
             </div>
           </div>
@@ -228,7 +236,7 @@ export default function GamePage() {
                   stiffness: 260,
                   damping: 20,
                 }}
-                className="w-full max-w-sm mx-auto"
+                className="w-full max-w-[340px] mx-auto"
               >
                 <GameCard
                   question={currentQuestion}
