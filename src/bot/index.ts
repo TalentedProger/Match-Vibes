@@ -14,14 +14,17 @@ let botInstance: Bot | null = null
 export function getBot(): Bot {
   if (!botInstance) {
     const token = process.env.TELEGRAM_BOT_TOKEN
-    
+
     if (!token) {
+      console.error('TELEGRAM_BOT_TOKEN is not set in environment variables')
       throw new Error('TELEGRAM_BOT_TOKEN is not set')
     }
 
+    console.log('Initializing bot instance...')
     botInstance = new Bot(token)
 
     // Register commands
+    console.log('Registering bot commands...')
     botInstance.command('start', handleStartCommand)
     botInstance.command('play', handlePlayCommand)
     botInstance.command('help', handleHelpCommand)
@@ -29,9 +32,11 @@ export function getBot(): Bot {
     botInstance.command('profile', handleProfileCommand)
 
     // Error handler
-    botInstance.catch((err) => {
-      console.error('Bot error:', err)
+    botInstance.catch(err => {
+      console.error('Bot command error:', err)
     })
+
+    console.log('Bot initialized successfully')
   }
 
   return botInstance

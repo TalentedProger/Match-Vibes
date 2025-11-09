@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { webhookCallback } from 'grammy'
 import { getBot } from '@/bot'
 
 /**
@@ -21,6 +20,8 @@ function verifyWebhookSecret(request: NextRequest): boolean {
  * Handle incoming webhook updates from Telegram
  */
 export async function POST(request: NextRequest) {
+  console.log('Webhook POST received')
+
   // Security check
   if (!verifyWebhookSecret(request)) {
     console.error('Invalid webhook secret token')
@@ -30,16 +31,41 @@ export async function POST(request: NextRequest) {
   try {
     const update = await request.json()
 
-    // Handle the update using grammy's webhook callback
+    // Log incoming update for debugging
+    console.log('Received update from Telegram:', {
+      update_id: update.update_id,
+      type: update.message
+        ? 'message'
+        : update.callback_query
+          ? 'callback'
+          : 'other',
+      message: update.message?.text || update.message?.caption,
+      from:
+        update.message?.from?.username || update.callback_query?.from?.username,
+    })
+
+    // Get bot instance
     const bot = getBot()
-    const handler = webhookCallback(bot, 'std/http')
-    await handler(update)
+
+    // Handle the update
+    console.log('Processing update with bot...')
+    await bot.handleUpdate(update)
+    console.log('Update processed successfully')
 
     return NextResponse.json({ ok: true })
   } catch (error) {
-    console.error('Webhook error:', error)
+    const errorMessage =
+      error instanceof Error ? error.message : 'Unknown error'
+    const errorStack = error instanceof Error ? error.stack : ''
+
+    console.error('Webhook error details:', {
+      message: errorMessage,
+      stack: errorStack,
+      error: error,
+    })
+
     return NextResponse.json(
-      { error: 'Internal server error' },
+      { error: 'Internal server error', details: errorMessage },
       { status: 500 }
     )
   }
