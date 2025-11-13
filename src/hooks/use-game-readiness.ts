@@ -62,9 +62,12 @@ export function useGameReadiness(
     lastChecked: null,
   })
 
-  const checkReadiness = useCallback(async (): Promise<void> => {
-    if (!roomId || !enabled) return
+  const [isChecking, setIsChecking] = useState(false) // Prevent multiple simultaneous requests
 
+  const checkReadiness = useCallback(async (): Promise<void> => {
+    if (!roomId || !enabled || isChecking) return
+
+    setIsChecking(true)
     setState(prev => ({ ...prev, isLoading: true, error: null }))
 
     try {
@@ -92,10 +95,13 @@ export function useGameReadiness(
       setState(prev => ({
         ...prev,
         isLoading: false,
+        error: errorMessage,
         lastChecked: new Date(),
       }))
+    } finally {
+      setIsChecking(false)
     }
-  }, [roomId, enabled, onReady, state.ready])
+  }, [roomId, enabled, onReady, state.ready, isChecking])
 
   // Initial check
   useEffect(() => {
@@ -104,13 +110,13 @@ export function useGameReadiness(
     }
   }, [roomId, enabled, checkReadiness])
 
-  // Polling
+  // Polling with protection
   useEffect(() => {
     if (!enabled || !roomId || pollInterval <= 0) return
 
     const intervalId = setInterval(() => {
-      // Only continue polling if not ready and no result exists
-      if (!state.ready && !state.resultExists) {
+      // Only continue polling if not ready, no result exists, and not already checking
+      if (!state.ready && !state.resultExists && !isChecking) {
         checkReadiness()
       }
     }, pollInterval)
@@ -122,6 +128,7 @@ export function useGameReadiness(
     pollInterval,
     state.ready,
     state.resultExists,
+    isChecking,
     checkReadiness,
   ])
 

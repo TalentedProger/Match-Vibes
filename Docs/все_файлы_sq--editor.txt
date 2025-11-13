@@ -1,0 +1,1801 @@
+-- MatchVibe Database Schema - SAFE RERUN VERSION
+-- Supabase PostgreSQL Setup
+-- Version: 1.0.1
+-- Last Updated: 2025-01-08
+-- This script can be run multiple times safely
+
+-- Enable UUID extension
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- Create profiles table
+CREATE TABLE IF NOT EXISTS profiles (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  telegram_id BIGINT UNIQUE NOT NULL,
+  username TEXT,
+  first_name TEXT,
+  last_name TEXT,
+  avatar_url TEXT,
+  premium_status BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Create categories table
+CREATE TABLE IF NOT EXISTS categories (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name TEXT NOT NULL,
+  description TEXT,
+  icon TEXT,
+  image_url TEXT,
+  color TEXT,
+  order_index INT DEFAULT 0,
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Create questions table
+CREATE TABLE IF NOT EXISTS questions (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  category_id UUID REFERENCES categories(id) ON DELETE CASCADE,
+  text TEXT NOT NULL,
+  image_url TEXT NOT NULL,
+  order_index INT DEFAULT 0,
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Create rooms table
+CREATE TABLE IF NOT EXISTS rooms (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  host_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
+  guest_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
+  category_id UUID REFERENCES categories(id) ON DELETE SET NULL,
+  status TEXT CHECK (status IN ('waiting', 'ready', 'playing', 'completed', 'cancelled')) DEFAULT 'waiting',
+  invitation_code TEXT UNIQUE NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  started_at TIMESTAMPTZ,
+  completed_at TIMESTAMPTZ
+);
+
+-- Create responses table
+CREATE TABLE IF NOT EXISTS responses (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  room_id UUID REFERENCES rooms(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
+  question_id UUID REFERENCES questions(id) ON DELETE CASCADE,
+  answer SMALLINT CHECK (answer IN (0, 1)) NOT NULL, -- 0 = dislike, 1 = like
+  timestamp TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(room_id, user_id, question_id)
+);
+
+-- Create results table
+CREATE TABLE IF NOT EXISTS results (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  room_id UUID UNIQUE REFERENCES rooms(id) ON DELETE CASCADE,
+  host_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
+  guest_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
+  category_id UUID REFERENCES categories(id) ON DELETE SET NULL,
+  match_percentage DECIMAL(5,2) NOT NULL,
+  host_favorite TEXT,
+  guest_favorite TEXT,
+  shared_item TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Create favorites table
+CREATE TABLE IF NOT EXISTS favorites (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
+  item_name TEXT NOT NULL,
+  category_id UUID REFERENCES categories(id) ON DELETE SET NULL,
+  image_url TEXT,
+  added_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(user_id, item_name, category_id)
+);
+
+-- Create achievements table
+CREATE TABLE IF NOT EXISTS achievements (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name TEXT NOT NULL,
+  description TEXT,
+  icon TEXT,
+  requirement INT NOT NULL,
+  type TEXT CHECK (type IN ('games', 'matches', 'friends', 'compatibility')) NOT NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Create user_achievements table
+CREATE TABLE IF NOT EXISTS user_achievements (
+  user_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
+  achievement_id UUID REFERENCES achievements(id) ON DELETE CASCADE,
+  unlocked_at TIMESTAMPTZ DEFAULT NOW(),
+  PRIMARY KEY (user_id, achievement_id)
+);
+
+-- Create indexes for better query performance
+CREATE INDEX IF NOT EXISTS idx_profiles_telegram_id ON profiles(telegram_id);
+CREATE INDEX IF NOT EXISTS idx_rooms_host_id ON rooms(host_id);
+CREATE INDEX IF NOT EXISTS idx_rooms_guest_id ON rooms(guest_id);
+CREATE INDEX IF NOT EXISTS idx_rooms_status ON rooms(status);
+CREATE INDEX IF NOT EXISTS idx_rooms_invitation_code ON rooms(invitation_code);
+CREATE INDEX IF NOT EXISTS idx_responses_room_id ON responses(room_id);
+CREATE INDEX IF NOT EXISTS idx_responses_user_id ON responses(user_id);
+CREATE INDEX IF NOT EXISTS idx_results_host_id ON results(host_id);
+CREATE INDEX IF NOT EXISTS idx_results_guest_id ON results(guest_id);
+CREATE INDEX IF NOT EXISTS idx_favorites_user_id ON favorites(user_id);
+CREATE INDEX IF NOT EXISTS idx_questions_category_id ON questions(category_id);
+
+-- Create updated_at trigger function (drop and recreate to avoid conflicts)
+DROP FUNCTION IF EXISTS update_updated_at_column() CASCADE;
+CREATE FUNCTION update_updated_at_column()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.updated_at = NOW();
+  RETURN NEW;
+END;
+$$ language 'plpgsql';
+
+-- Add trigger to profiles table (drop and recreate to avoid conflicts)
+DROP TRIGGER IF EXISTS update_profiles_updated_at ON profiles;
+CREATE TRIGGER update_profiles_updated_at 
+BEFORE UPDATE ON profiles 
+FOR EACH ROW 
+EXECUTE FUNCTION update_updated_at_column();
+
+-- Row Level Security (RLS) Policies
+-- SIMPLIFIED FOR TELEGRAM MINI APP (No Supabase Auth)
+-- Note: For production, consider implementing service role authentication
+
+-- Enable RLS on all tables
+ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE rooms ENABLE ROW LEVEL SECURITY;
+ALTER TABLE responses ENABLE ROW LEVEL SECURITY;
+ALTER TABLE results ENABLE ROW LEVEL SECURITY;
+ALTER TABLE favorites ENABLE ROW LEVEL SECURITY;
+ALTER TABLE categories ENABLE ROW LEVEL SECURITY;
+ALTER TABLE questions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE achievements ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_achievements ENABLE ROW LEVEL SECURITY;
+
+-- Drop existing policies to avoid conflicts
+DROP POLICY IF EXISTS "Allow all operations on profiles" ON profiles;
+DROP POLICY IF EXISTS "Allow all operations on rooms" ON rooms;
+DROP POLICY IF EXISTS "Allow all operations on responses" ON responses;
+DROP POLICY IF EXISTS "Allow all operations on results" ON results;
+DROP POLICY IF EXISTS "Allow all operations on favorites" ON favorites;
+DROP POLICY IF EXISTS "Categories are viewable by everyone" ON categories;
+DROP POLICY IF EXISTS "Questions are viewable by everyone" ON questions;
+DROP POLICY IF EXISTS "Achievements are viewable by everyone" ON achievements;
+DROP POLICY IF EXISTS "Allow all operations on user_achievements" ON user_achievements;
+
+-- Profiles: Allow all operations (Telegram validates on API level)
+CREATE POLICY "Allow all operations on profiles"
+  ON profiles
+  USING (true)
+  WITH CHECK (true);
+
+-- Rooms: Allow all operations
+CREATE POLICY "Allow all operations on rooms"
+  ON rooms
+  USING (true)
+  WITH CHECK (true);
+
+-- Responses: Allow all operations
+CREATE POLICY "Allow all operations on responses"
+  ON responses
+  USING (true)
+  WITH CHECK (true);
+
+-- Results: Allow all operations
+CREATE POLICY "Allow all operations on results"
+  ON results
+  USING (true)
+  WITH CHECK (true);
+
+-- Favorites: Allow all operations
+CREATE POLICY "Allow all operations on favorites"
+  ON favorites
+  USING (true)
+  WITH CHECK (true);
+
+-- Categories: Public read-only
+CREATE POLICY "Categories are viewable by everyone"
+  ON categories FOR SELECT
+  USING (is_active = TRUE);
+
+-- Questions: Public read-only
+CREATE POLICY "Questions are viewable by everyone"
+  ON questions FOR SELECT
+  USING (is_active = TRUE);
+
+-- Achievements: Public read-only
+CREATE POLICY "Achievements are viewable by everyone"
+  ON achievements FOR SELECT
+  USING (true);
+
+-- User Achievements: Allow all operations (users can unlock achievements)
+CREATE POLICY "Allow all operations on user_achievements"
+  ON user_achievements
+  USING (true)
+  WITH CHECK (true);
+
+-- Seed initial categories (ON CONFLICT DO NOTHING to avoid duplicates)
+INSERT INTO categories (name, description, icon, color, order_index) VALUES
+  ('Еда и напитки', 'Узнайте ваши общие вкусы в еде', '🍕', 'hsl(25, 100%, 66%)', 1),
+  ('Фильмы', 'Найдите общие любимые фильмы', '🎬', 'hsl(276, 100%, 70%)', 2),
+  ('Животные', 'Кого вы любите больше?', '🐶', 'hsl(30, 100%, 74%)', 3),
+  ('Отношения', 'Узнайте о важном в отношениях', '💞', 'hsl(345, 100%, 74%)', 4),
+  ('Путешествия', 'Куда бы вы хотели поехать', '🏖️', 'hsl(210, 100%, 70%)', 5)
+ON CONFLICT DO NOTHING;
+
+-- Seed initial achievements (ON CONFLICT DO NOTHING to avoid duplicates)
+INSERT INTO achievements (name, description, icon, requirement, type) VALUES
+  ('Первая игра', 'Сыграйте первую игру', '🎯', 1, 'games'),
+  ('10 игр', 'Сыграйте 10 игр', '🔥', 10, 'games'),
+  ('50 игр', 'Сыграйте 50 игр', '⭐', 50, 'games'),
+  ('Первое совпадение', 'Найдите первое совпадение', '💫', 1, 'matches'),
+  ('10 совпадений', 'Найдите 10 совпадений', '✨', 10, 'matches'),
+  ('Высокая совместимость', 'Достигните 80%+ совместимости', '💯', 80, 'compatibility')
+ON CONFLICT DO NOTHING;
+
+-- Success message
+DO $$
+BEGIN
+  RAISE NOTICE '✅ Database schema created/updated successfully!';
+  RAISE NOTICE 'Created tables: profiles, categories, questions, rooms, responses, results, favorites, achievements, user_achievements';
+  RAISE NOTICE 'RLS policies configured for Telegram Mini App';
+END $$;
+
+-- MatchVibe Questions Seed Data
+-- 12+ questions per category with images
+-- Version: 1.0.0
+-- Last Updated: 2025-01-08
+
+-- Temporary variables to hold category IDs
+DO $$
+DECLARE
+  food_cat_id UUID;
+  movies_cat_id UUID;
+  animals_cat_id UUID;
+  relations_cat_id UUID;
+  travel_cat_id UUID;
+BEGIN
+  -- Get category IDs
+  SELECT id INTO food_cat_id FROM categories WHERE name = 'Еда и напитки';
+  SELECT id INTO movies_cat_id FROM categories WHERE name = 'Фильмы';
+  SELECT id INTO animals_cat_id FROM categories WHERE name = 'Животные';
+  SELECT id INTO relations_cat_id FROM categories WHERE name = 'Отношения';
+  SELECT id INTO travel_cat_id FROM categories WHERE name = 'Путешествия';
+
+  -- ========================================
+  -- CATEGORY 1: Еда и напитки (Food & Drinks)
+  -- ========================================
+  INSERT INTO questions (category_id, text, image_url, order_index) VALUES
+    (food_cat_id, 'Пицца', 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=400&h=400&fit=crop', 1),
+    (food_cat_id, 'Суши', 'https://images.unsplash.com/photo-1579584425555-c3ce17fd4351?w=400&h=400&fit=crop', 2),
+    (food_cat_id, 'Бургеры', 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?w=400&h=400&fit=crop', 3),
+    (food_cat_id, 'Паста', 'https://images.unsplash.com/photo-1621996346565-e3dbc646d9a9?w=400&h=400&fit=crop', 4),
+    (food_cat_id, 'Стейк', 'https://images.unsplash.com/photo-1588168333986-5078d3ae3976?w=400&h=400&fit=crop', 5),
+    (food_cat_id, 'Шоколад', 'https://images.unsplash.com/photo-1511381939415-e44015466834?w=400&h=400&fit=crop', 6),
+    (food_cat_id, 'Мороженое', 'https://images.unsplash.com/photo-1563805042-7684c019e1cb?w=400&h=400&fit=crop', 7),
+    (food_cat_id, 'Кофе', 'https://images.unsplash.com/photo-1511920170033-f8396924c348?w=400&h=400&fit=crop', 8),
+    (food_cat_id, 'Чай', 'https://images.unsplash.com/photo-1564890369478-c89ca6d9cde9?w=400&h=400&fit=crop', 9),
+    (food_cat_id, 'Вино', 'https://images.unsplash.com/photo-1510812431401-41d2bd2722f3?w=400&h=400&fit=crop', 10),
+    (food_cat_id, 'Пиво', 'https://images.unsplash.com/photo-1608270586620-248524c67de9?w=400&h=400&fit=crop', 11),
+    (food_cat_id, 'Коктейли', 'https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?w=400&h=400&fit=crop', 12),
+    (food_cat_id, 'Торты', 'https://images.unsplash.com/photo-1578985545062-69928b1d9587?w=400&h=400&fit=crop', 13),
+    (food_cat_id, 'Фрукты', 'https://images.unsplash.com/photo-1619566636858-adf3ef46400b?w=400&h=400&fit=crop', 14),
+    (food_cat_id, 'Овощи', 'https://images.unsplash.com/photo-1540420773420-3366772f4999?w=400&h=400&fit=crop', 15)
+  ON CONFLICT DO NOTHING;
+
+  -- ========================================
+  -- CATEGORY 2: Фильмы (Movies)
+  -- ========================================
+  INSERT INTO questions (category_id, text, image_url, order_index) VALUES
+    (movies_cat_id, 'Комедии', 'https://images.unsplash.com/photo-1594908900066-3f47337549d8?w=400&h=400&fit=crop', 1),
+    (movies_cat_id, 'Боевики', 'https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=400&h=400&fit=crop', 2),
+    (movies_cat_id, 'Романтика', 'https://images.unsplash.com/photo-1518676590629-3dcbd9c5a5c9?w=400&h=400&fit=crop', 3),
+    (movies_cat_id, 'Ужасы', 'https://images.unsplash.com/photo-1509248961158-e54f6934749c?w=400&h=400&fit=crop', 4),
+    (movies_cat_id, 'Научная фантастика', 'https://images.unsplash.com/photo-1635805737707-575885ab0820?w=400&h=400&fit=crop', 5),
+    (movies_cat_id, 'Фэнтези', 'https://images.unsplash.com/photo-1518676590629-3dcbd9c5a5c9?w=400&h=400&fit=crop', 6),
+    (movies_cat_id, 'Документальные', 'https://images.unsplash.com/photo-1478720568477-152d9b164e26?w=400&h=400&fit=crop', 7),
+    (movies_cat_id, 'Драма', 'https://images.unsplash.com/photo-1485846234645-a62644f84728?w=400&h=400&fit=crop', 8),
+    (movies_cat_id, 'Триллеры', 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=400&h=400&fit=crop', 9),
+    (movies_cat_id, 'Анимация', 'https://images.unsplash.com/photo-1536440136628-849c177e76a1?w=400&h=400&fit=crop', 10),
+    (movies_cat_id, 'Детективы', 'https://images.unsplash.com/photo-1560109947-543149eceb16?w=400&h=400&fit=crop', 11),
+    (movies_cat_id, 'Мюзиклы', 'https://images.unsplash.com/photo-1507676184212-d03ab07a01bf?w=400&h=400&fit=crop', 12),
+    (movies_cat_id, 'Приключения', 'https://images.unsplash.com/photo-1485846234645-a62644f84728?w=400&h=400&fit=crop', 13),
+    (movies_cat_id, 'Биографии', 'https://images.unsplash.com/photo-1489599849927-2ee91cede3ba?w=400&h=400&fit=crop', 14),
+    (movies_cat_id, 'Артхаус', 'https://images.unsplash.com/photo-1478720568477-152d9b164e26?w=400&h=400&fit=crop', 15)
+  ON CONFLICT DO NOTHING;
+
+  -- ========================================
+  -- CATEGORY 3: Животные (Animals)
+  -- ========================================
+  INSERT INTO questions (category_id, text, image_url, order_index) VALUES
+    (animals_cat_id, 'Собаки', 'https://images.unsplash.com/photo-1587300003388-59208cc962cb?w=400&h=400&fit=crop', 1),
+    (animals_cat_id, 'Кошки', 'https://images.unsplash.com/photo-1574158622682-e40e69881006?w=400&h=400&fit=crop', 2),
+    (animals_cat_id, 'Птицы', 'https://images.unsplash.com/photo-1552728089-57bdde30beb3?w=400&h=400&fit=crop', 3),
+    (animals_cat_id, 'Рыбки', 'https://images.unsplash.com/photo-1520990269612-c18a49fa3c3e?w=400&h=400&fit=crop', 4),
+    (animals_cat_id, 'Лошади', 'https://images.unsplash.com/photo-1553284965-83fd3e82fa5a?w=400&h=400&fit=crop', 5),
+    (animals_cat_id, 'Кролики', 'https://images.unsplash.com/photo-1585110396000-c9ffd4e4b308?w=400&h=400&fit=crop', 6),
+    (animals_cat_id, 'Хомяки', 'https://images.unsplash.com/photo-1548767797-d8c844163c4c?w=400&h=400&fit=crop', 7),
+    (animals_cat_id, 'Черепахи', 'https://images.unsplash.com/photo-1437622368342-7a3d73a34c8f?w=400&h=400&fit=crop', 8),
+    (animals_cat_id, 'Змеи', 'https://images.unsplash.com/photo-1531386151447-fd76ad50012f?w=400&h=400&fit=crop', 9),
+    (animals_cat_id, 'Панды', 'https://images.unsplash.com/photo-1564349683136-77e08dba1ef7?w=400&h=400&fit=crop', 10),
+    (animals_cat_id, 'Тигры', 'https://images.unsplash.com/photo-1561731216-c3a4d99437d5?w=400&h=400&fit=crop', 11),
+    (animals_cat_id, 'Дельфины', 'https://images.unsplash.com/photo-1570481662006-a3a1374699e8?w=400&h=400&fit=crop', 12),
+    (animals_cat_id, 'Слоны', 'https://images.unsplash.com/photo-1564760055775-d63b17a55c44?w=400&h=400&fit=crop', 13),
+    (animals_cat_id, 'Жирафы', 'https://images.unsplash.com/photo-1547721064-da6cfb341d50?w=400&h=400&fit=crop', 14),
+    (animals_cat_id, 'Пингвины', 'https://images.unsplash.com/photo-1551986782-d0169b3f8fa7?w=400&h=400&fit=crop', 15)
+  ON CONFLICT DO NOTHING;
+
+  -- ========================================
+  -- CATEGORY 4: Отношения (Relationships)
+  -- ========================================
+  INSERT INTO questions (category_id, text, image_url, order_index) VALUES
+    (relations_cat_id, 'Романтические ужины', 'https://images.unsplash.com/photo-1481833761820-0509d3217039?w=400&h=400&fit=crop', 1),
+    (relations_cat_id, 'Путешествия вместе', 'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=400&h=400&fit=crop', 2),
+    (relations_cat_id, 'Доверие', 'https://images.unsplash.com/photo-1516589178581-6cd7833ae3b2?w=400&h=400&fit=crop', 3),
+    (relations_cat_id, 'Общие хобби', 'https://images.unsplash.com/photo-1511988617509-a57c8a288659?w=400&h=400&fit=crop', 4),
+    (relations_cat_id, 'Сюрпризы', 'https://images.unsplash.com/photo-1513885535751-8b9238bd345a?w=400&h=400&fit=crop', 5),
+    (relations_cat_id, 'Откровенные разговоры', 'https://images.unsplash.com/photo-1521791055366-0d553872125f?w=400&h=400&fit=crop', 6),
+    (relations_cat_id, 'Совместный отдых', 'https://images.unsplash.com/photo-1523438097201-512ae7d59c44?w=400&h=400&fit=crop', 7),
+    (relations_cat_id, 'Поддержка', 'https://images.unsplash.com/photo-1529333166437-7750a6dd5a70?w=400&h=400&fit=crop', 8),
+    (relations_cat_id, 'Юмор', 'https://images.unsplash.com/photo-1555421689-d68471e189f2?w=400&h=400&fit=crop', 9),
+    (relations_cat_id, 'Личное пространство', 'https://images.unsplash.com/photo-1524678606370-a47ad25cb82a?w=400&h=400&fit=crop', 10),
+    (relations_cat_id, 'Общие цели', 'https://images.unsplash.com/photo-1512428559087-560fa5ceab42?w=400&h=400&fit=crop', 11),
+    (relations_cat_id, 'Семейные ценности', 'https://images.unsplash.com/photo-1511895426328-dc8714191300?w=400&h=400&fit=crop', 12),
+    (relations_cat_id, 'Спонтанность', 'https://images.unsplash.com/photo-1533577116850-9cc66cad8a9b?w=400&h=400&fit=crop', 13),
+    (relations_cat_id, 'Романтика', 'https://images.unsplash.com/photo-1518568814500-bf0f8d125f46?w=400&h=400&fit=crop', 14),
+    (relations_cat_id, 'Верность', 'https://images.unsplash.com/photo-1518709268805-4e9042af9f23?w=400&h=400&fit=crop', 15)
+  ON CONFLICT DO NOTHING;
+
+  -- ========================================
+  -- CATEGORY 5: Путешествия (Travel)
+  -- ========================================
+  INSERT INTO questions (category_id, text, image_url, order_index) VALUES
+    (travel_cat_id, 'Пляжный отдых', 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?w=400&h=400&fit=crop', 1),
+    (travel_cat_id, 'Горнолыжные курорты', 'https://images.unsplash.com/photo-1551524164-687a55dd1126?w=400&h=400&fit=crop', 2),
+    (travel_cat_id, 'Города Европы', 'https://images.unsplash.com/photo-1467269204594-9661b134dd2b?w=400&h=400&fit=crop', 3),
+    (travel_cat_id, 'Экзотические страны', 'https://images.unsplash.com/photo-1537996194471-e657df975ab4?w=400&h=400&fit=crop', 4),
+    (travel_cat_id, 'Дикая природа', 'https://images.unsplash.com/photo-1441974231531-c6227db76b6e?w=400&h=400&fit=crop', 5),
+    (travel_cat_id, 'Исторические места', 'https://images.unsplash.com/photo-1513581166391-887a96ddeafd?w=400&h=400&fit=crop', 6),
+    (travel_cat_id, 'Мегаполисы', 'https://images.unsplash.com/photo-1480714378408-67cf0d13bc1b?w=400&h=400&fit=crop', 7),
+    (travel_cat_id, 'Круизы', 'https://images.unsplash.com/photo-1520250497591-112f2f40a3f4?w=400&h=400&fit=crop', 8),
+    (travel_cat_id, 'Кемпинг', 'https://images.unsplash.com/photo-1504280390367-361c6d9f38f4?w=400&h=400&fit=crop', 9),
+    (travel_cat_id, 'Роскошные отели', 'https://images.unsplash.com/photo-1566073771259-6a8506099945?w=400&h=400&fit=crop', 10),
+    (travel_cat_id, 'Сафари', 'https://images.unsplash.com/photo-1516426122078-c23e76319801?w=400&h=400&fit=crop', 11),
+    (travel_cat_id, 'Островные курорты', 'https://images.unsplash.com/photo-1559827260-dc66d52bef19?w=400&h=400&fit=crop', 12),
+    (travel_cat_id, 'Горные походы', 'https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=400&h=400&fit=crop', 13),
+    (travel_cat_id, 'Культурные туры', 'https://images.unsplash.com/photo-1533929736458-ca588d08c8be?w=400&h=400&fit=crop', 14),
+    (travel_cat_id, 'Гастрономические туры', 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=400&h=400&fit=crop', 15)
+  ON CONFLICT DO NOTHING;
+
+  RAISE NOTICE '✅ Questions seed data inserted successfully!';
+  RAISE NOTICE 'Total: 75 questions (15 per category × 5 categories)';
+END $$;
+
+ALTER TABLE profiles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE rooms ENABLE ROW LEVEL SECURITY;
+ALTER TABLE responses ENABLE ROW LEVEL SECURITY;
+ALTER TABLE results ENABLE ROW LEVEL SECURITY;
+ALTER TABLE favorites ENABLE ROW LEVEL SECURITY;
+ALTER TABLE categories ENABLE ROW LEVEL SECURITY;
+ALTER TABLE questions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE achievements ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_achievements ENABLE ROW LEVEL SECURITY;
+
+SELECT 
+  'Categories' as table_name,
+  COUNT(*) as count
+FROM categories
+UNION ALL
+SELECT 
+  'Questions' as table_name,
+  COUNT(*) as count
+FROM questions;
+
+-- Subcategories Migration for MatchVibe
+-- Adds subcategory structure to existing categories
+-- Version: 1.0.0
+-- Date: 2025-01-09
+
+-- ========================================
+-- 1. Create Subcategories Table
+-- ========================================
+
+CREATE TABLE IF NOT EXISTS subcategories (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  category_id UUID NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  description TEXT,
+  icon TEXT,
+  order_index INTEGER NOT NULL DEFAULT 0,
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW()),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW())
+);
+
+-- Add index for faster lookups
+CREATE INDEX IF NOT EXISTS idx_subcategories_category 
+ON subcategories(category_id, is_active, order_index);
+
+-- Enable RLS
+ALTER TABLE subcategories ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policy: Anyone can view active subcategories
+DROP POLICY IF EXISTS "Subcategories are viewable by everyone" ON subcategories;
+CREATE POLICY "Subcategories are viewable by everyone"
+  ON subcategories FOR SELECT
+  USING (is_active = TRUE);
+
+-- ========================================
+-- 2. Update Questions Table
+-- ========================================
+
+-- Add subcategory_id column to questions
+ALTER TABLE questions 
+ADD COLUMN IF NOT EXISTS subcategory_id UUID REFERENCES subcategories(id) ON DELETE SET NULL;
+
+-- Create index for subcategory lookups
+CREATE INDEX IF NOT EXISTS idx_questions_subcategory 
+ON questions(subcategory_id);
+
+-- ========================================
+-- 3. Clean up existing duplicates
+-- ========================================
+
+-- Delete duplicate subcategories, keeping only the first one
+DELETE FROM subcategories
+WHERE id NOT IN (
+  SELECT MIN(id)
+  FROM subcategories
+  GROUP BY category_id, name
+);
+
+-- Now create unique constraint to prevent future duplicates
+DROP INDEX IF EXISTS idx_subcategories_unique;
+CREATE UNIQUE INDEX idx_subcategories_unique 
+ON subcategories(category_id, name) WHERE is_active = TRUE;
+
+-- ========================================
+-- 4. Insert Subcategories Data
+-- ========================================
+
+DO $$
+DECLARE
+  food_cat_id UUID;
+  entertainment_cat_id UUID;
+  animals_cat_id UUID;
+  relationships_cat_id UUID;
+  leisure_cat_id UUID;
+  perception_cat_id UUID;
+  misc_cat_id UUID;
+BEGIN
+  -- Get existing category IDs by icon (more reliable than name)
+  SELECT id INTO food_cat_id FROM categories WHERE icon = '🍕' LIMIT 1;
+  SELECT id INTO entertainment_cat_id FROM categories WHERE icon = '🎬' LIMIT 1;
+  SELECT id INTO animals_cat_id FROM categories WHERE icon = '🐶' LIMIT 1;
+  SELECT id INTO relationships_cat_id FROM categories WHERE icon = '💞' LIMIT 1;
+  SELECT id INTO leisure_cat_id FROM categories WHERE icon = '🏖️' LIMIT 1;
+  
+  -- Try to find by name if icon search failed
+  IF food_cat_id IS NULL THEN
+    SELECT id INTO food_cat_id FROM categories WHERE name ILIKE '%еда%' OR name ILIKE '%food%' LIMIT 1;
+  END IF;
+  
+  IF entertainment_cat_id IS NULL THEN
+    SELECT id INTO entertainment_cat_id FROM categories WHERE name ILIKE '%развлечен%' OR name ILIKE '%фильм%' LIMIT 1;
+  END IF;
+  
+  IF animals_cat_id IS NULL THEN
+    SELECT id INTO animals_cat_id FROM categories WHERE name ILIKE '%животн%' OR name ILIKE '%animal%' LIMIT 1;
+  END IF;
+  
+  IF relationships_cat_id IS NULL THEN
+    SELECT id INTO relationships_cat_id FROM categories WHERE name ILIKE '%отношен%' OR name ILIKE '%личност%' LIMIT 1;
+  END IF;
+  
+  IF leisure_cat_id IS NULL THEN
+    SELECT id INTO leisure_cat_id FROM categories WHERE name ILIKE '%досуг%' OR name ILIKE '%путешеств%' LIMIT 1;
+  END IF;
+  
+  -- If still not found, raise notice
+  IF food_cat_id IS NULL THEN
+    RAISE NOTICE 'WARNING: Food category not found! Please create it first.';
+  END IF;
+  
+  IF entertainment_cat_id IS NULL THEN
+    RAISE NOTICE 'WARNING: Entertainment category not found! Please create it first.';
+  END IF;
+  
+  IF animals_cat_id IS NULL THEN
+    RAISE NOTICE 'WARNING: Animals category not found! Please create it first.';
+  END IF;
+  
+  IF relationships_cat_id IS NULL THEN
+    RAISE NOTICE 'WARNING: Relationships category not found! Please create it first.';
+  END IF;
+  
+  IF leisure_cat_id IS NULL THEN
+    RAISE NOTICE 'WARNING: Leisure category not found! Please create it first.';
+  END IF;
+
+  -- Insert Subcategories (only if category exists)
+
+  -- 🍕 Еда и напитки
+  IF food_cat_id IS NOT NULL THEN
+    INSERT INTO subcategories (category_id, name, order_index) VALUES
+      (food_cat_id, 'Любимая кухня', 1),
+      (food_cat_id, 'Любимое блюдо', 2),
+      (food_cat_id, 'Кофе / чай', 3),
+      (food_cat_id, 'Десерты', 4),
+      (food_cat_id, 'Уличная еда', 5),
+      (food_cat_id, 'Завтрак мечты', 6),
+      (food_cat_id, 'Ресторан мечты', 7)
+    ON CONFLICT DO NOTHING;
+    RAISE NOTICE '✅ Food subcategories created';
+  END IF;
+
+  -- 🎬 Развлечения и культура
+  IF entertainment_cat_id IS NOT NULL THEN
+    INSERT INTO subcategories (category_id, name, order_index) VALUES
+      (entertainment_cat_id, 'Любимый фильм', 1),
+      (entertainment_cat_id, 'Любимый жанр кино', 2),
+      (entertainment_cat_id, 'Любимый исполнитель', 3),
+      (entertainment_cat_id, 'Любимая песня', 4),
+      (entertainment_cat_id, 'Сериал, который стоит пересмотреть', 5),
+      (entertainment_cat_id, 'Любимая игра (настольная / видеоигра)', 6),
+      (entertainment_cat_id, 'Самый вдохновляющий фильм', 7)
+    ON CONFLICT DO NOTHING;
+    RAISE NOTICE '✅ Entertainment subcategories created';
+  END IF;
+
+  -- 🐶 Животные
+  IF animals_cat_id IS NOT NULL THEN
+    INSERT INTO subcategories (category_id, name, order_index) VALUES
+      (animals_cat_id, 'Любимая порода собак', 1),
+      (animals_cat_id, 'Кошки vs собаки', 2),
+      (animals_cat_id, 'Идеальный питомец', 3),
+      (animals_cat_id, 'Дикая природа или домашние любимцы', 4)
+    ON CONFLICT DO NOTHING;
+    RAISE NOTICE '✅ Animals subcategories created';
+  END IF;
+
+  -- 💞 Отношения и личность
+  IF relationships_cat_id IS NOT NULL THEN
+    INSERT INTO subcategories (category_id, name, order_index) VALUES
+      (relationships_cat_id, 'Главное качество в человеке', 1),
+      (relationships_cat_id, 'Главный страх', 2),
+      (relationships_cat_id, 'Заветная мечта', 3),
+      (relationships_cat_id, 'Отношение к дружбе', 4),
+      (relationships_cat_id, 'Как ты проявляешь заботу', 5),
+      (relationships_cat_id, 'Любимый тип отдыха вдвоем', 6)
+    ON CONFLICT DO NOTHING;
+    RAISE NOTICE '✅ Relationships subcategories created';
+  END IF;
+
+  -- 🏖️ Досуг и путешествия
+  IF leisure_cat_id IS NOT NULL THEN
+    INSERT INTO subcategories (category_id, name, order_index) VALUES
+      (leisure_cat_id, 'Любимое место отдыха', 1),
+      (leisure_cat_id, 'Идеальное путешествие', 2),
+      (leisure_cat_id, 'Активный отдых или релакс', 3),
+      (leisure_cat_id, 'Город мечты', 4),
+      (leisure_cat_id, 'Идеальный выходной', 5)
+    ON CONFLICT DO NOTHING;
+    RAISE NOTICE '✅ Leisure subcategories created';
+  END IF;
+
+  RAISE NOTICE '✅ Subcategories created successfully!';
+END $$;
+
+-- ========================================
+-- 5. Verification
+-- ========================================
+
+-- Check subcategories count
+DO $$
+DECLARE
+  subcat_count INTEGER;
+BEGIN
+  SELECT COUNT(*) INTO subcat_count FROM subcategories;
+  RAISE NOTICE 'Total subcategories: %', subcat_count;
+END $$;
+
+-- Show subcategories grouped by category
+SELECT 
+  c.name as category_name,
+  c.icon as category_icon,
+  COUNT(sc.id) as subcategory_count
+FROM categories c
+LEFT JOIN subcategories sc ON sc.category_id = c.id
+GROUP BY c.id, c.name, c.icon, c.order_index
+ORDER BY c.order_index;
+
+-- ========================================
+-- FIX CATEGORY DUPLICATES - FINAL SOLUTION
+-- ========================================
+-- Этот скрипт:
+-- 1. Удаляет все дубликаты категорий
+-- 2. Оставляет только одну категорию с каждым emoji
+-- 3. Обновляет названия на правильные
+-- 4. Перепривязывает подкатегории к правильным категориям
+-- ========================================
+
+BEGIN;
+
+-- ========================================
+-- ШАГ 1: Найти категории с подкатегориями (те что нужно оставить)
+-- ========================================
+
+DO $$
+DECLARE
+  -- Категории которые нужно оставить (те, у которых есть подкатегории)
+  food_keep_id UUID;
+  entertainment_keep_id UUID;
+  animals_keep_id UUID;
+  relationships_keep_id UUID;
+  leisure_keep_id UUID;
+  perception_keep_id UUID;
+  misc_keep_id UUID;
+  
+  -- Временные переменные для подсчета
+  deleted_count INTEGER := 0;
+BEGIN
+  
+  RAISE NOTICE '==============================================';
+  RAISE NOTICE 'FIXING CATEGORY DUPLICATES';
+  RAISE NOTICE '==============================================';
+  
+  -- ========================================
+  -- ШАГ 2: Найти "правильные" категории (с подкатегориями)
+  -- ========================================
+  
+  -- 🍕 Еда и напитки
+  SELECT c.id INTO food_keep_id
+  FROM categories c
+  LEFT JOIN subcategories sc ON sc.category_id = c.id
+  WHERE c.icon = '🍕'
+  GROUP BY c.id
+  HAVING COUNT(sc.id) > 0
+  LIMIT 1;
+  
+  -- 🎬 Развлечения и культура
+  SELECT c.id INTO entertainment_keep_id
+  FROM categories c
+  LEFT JOIN subcategories sc ON sc.category_id = c.id
+  WHERE c.icon = '🎬'
+  GROUP BY c.id
+  HAVING COUNT(sc.id) > 0
+  LIMIT 1;
+  
+  -- 🐶 Животные
+  SELECT c.id INTO animals_keep_id
+  FROM categories c
+  LEFT JOIN subcategories sc ON sc.category_id = c.id
+  WHERE c.icon = '🐶'
+  GROUP BY c.id
+  HAVING COUNT(sc.id) > 0
+  LIMIT 1;
+  
+  -- 💞 Отношения и личность
+  SELECT c.id INTO relationships_keep_id
+  FROM categories c
+  LEFT JOIN subcategories sc ON sc.category_id = c.id
+  WHERE c.icon = '💞'
+  GROUP BY c.id
+  HAVING COUNT(sc.id) > 0
+  LIMIT 1;
+  
+  -- 🏖️ Досуг и путешествия
+  SELECT c.id INTO leisure_keep_id
+  FROM categories c
+  LEFT JOIN subcategories sc ON sc.category_id = c.id
+  WHERE c.icon = '🏖️'
+  GROUP BY c.id
+  HAVING COUNT(sc.id) > 0
+  LIMIT 1;
+  
+  -- 💡 Личное восприятие (обычно не дублируется, но проверим)
+  SELECT c.id INTO perception_keep_id
+  FROM categories c
+  WHERE c.icon = '💡'
+  LIMIT 1;
+  
+  -- 🎁 Разное и весёлое (обычно не дублируется, но проверим)
+  SELECT c.id INTO misc_keep_id
+  FROM categories c
+  WHERE c.icon = '🎁'
+  LIMIT 1;
+  
+  RAISE NOTICE '';
+  RAISE NOTICE 'Found categories to keep:';
+  RAISE NOTICE '  🍕 Food: %', food_keep_id;
+  RAISE NOTICE '  🎬 Entertainment: %', entertainment_keep_id;
+  RAISE NOTICE '  🐶 Animals: %', animals_keep_id;
+  RAISE NOTICE '  💞 Relationships: %', relationships_keep_id;
+  RAISE NOTICE '  🏖️ Leisure: %', leisure_keep_id;
+  RAISE NOTICE '  💡 Perception: %', perception_keep_id;
+  RAISE NOTICE '  🎁 Misc: %', misc_keep_id;
+  RAISE NOTICE '';
+  
+  -- ========================================
+  -- ШАГ 3: Обновить названия "правильных" категорий
+  -- ========================================
+  
+  RAISE NOTICE 'Updating category names...';
+  
+  IF food_keep_id IS NOT NULL THEN
+    UPDATE categories SET name = 'Еда и напитки' WHERE id = food_keep_id;
+    RAISE NOTICE '  ✅ Updated: Еда и напитки';
+  END IF;
+  
+  IF entertainment_keep_id IS NOT NULL THEN
+    UPDATE categories SET name = 'Развлечения и культура' WHERE id = entertainment_keep_id;
+    RAISE NOTICE '  ✅ Updated: Развлечения и культура';
+  END IF;
+  
+  IF animals_keep_id IS NOT NULL THEN
+    UPDATE categories SET name = 'Животные' WHERE id = animals_keep_id;
+    RAISE NOTICE '  ✅ Updated: Животные';
+  END IF;
+  
+  IF relationships_keep_id IS NOT NULL THEN
+    UPDATE categories SET name = 'Отношения и личность' WHERE id = relationships_keep_id;
+    RAISE NOTICE '  ✅ Updated: Отношения и личность';
+  END IF;
+  
+  IF leisure_keep_id IS NOT NULL THEN
+    UPDATE categories SET name = 'Досуг и путешествия' WHERE id = leisure_keep_id;
+    RAISE NOTICE '  ✅ Updated: Досуг и путешествия';
+  END IF;
+  
+  IF perception_keep_id IS NOT NULL THEN
+    UPDATE categories SET name = 'Личное восприятие' WHERE id = perception_keep_id;
+    RAISE NOTICE '  ✅ Updated: Личное восприятие';
+  END IF;
+  
+  IF misc_keep_id IS NOT NULL THEN
+    UPDATE categories SET name = 'Разное и весёлое' WHERE id = misc_keep_id;
+    RAISE NOTICE '  ✅ Updated: Разное и весёлое';
+  END IF;
+  
+  RAISE NOTICE '';
+  
+  -- ========================================
+  -- ШАГ 4: Удалить дубликаты категорий
+  -- ========================================
+  
+  RAISE NOTICE 'Deleting duplicate categories...';
+  
+  -- Удаляем все категории с emoji 🍕 кроме той, которую оставляем
+  IF food_keep_id IS NOT NULL THEN
+    DELETE FROM categories WHERE icon = '🍕' AND id != food_keep_id;
+    GET DIAGNOSTICS deleted_count = ROW_COUNT;
+    RAISE NOTICE '  🍕 Deleted % duplicates', deleted_count;
+  END IF;
+  
+  -- Удаляем все категории с emoji 🎬 кроме той, которую оставляем
+  IF entertainment_keep_id IS NOT NULL THEN
+    DELETE FROM categories WHERE icon = '🎬' AND id != entertainment_keep_id;
+    GET DIAGNOSTICS deleted_count = ROW_COUNT;
+    RAISE NOTICE '  🎬 Deleted % duplicates', deleted_count;
+  END IF;
+  
+  -- Удаляем все категории с emoji 🐶 кроме той, которую оставляем
+  IF animals_keep_id IS NOT NULL THEN
+    DELETE FROM categories WHERE icon = '🐶' AND id != animals_keep_id;
+    GET DIAGNOSTICS deleted_count = ROW_COUNT;
+    RAISE NOTICE '  🐶 Deleted % duplicates', deleted_count;
+  END IF;
+  
+  -- Удаляем все категории с emoji 💞 кроме той, которую оставляем
+  IF relationships_keep_id IS NOT NULL THEN
+    DELETE FROM categories WHERE icon = '💞' AND id != relationships_keep_id;
+    GET DIAGNOSTICS deleted_count = ROW_COUNT;
+    RAISE NOTICE '  💞 Deleted % duplicates', deleted_count;
+  END IF;
+  
+  -- Удаляем все категории с emoji 🏖️ кроме той, которую оставляем
+  IF leisure_keep_id IS NOT NULL THEN
+    DELETE FROM categories WHERE icon = '🏖️' AND id != leisure_keep_id;
+    GET DIAGNOSTICS deleted_count = ROW_COUNT;
+    RAISE NOTICE '  🏖️ Deleted % duplicates', deleted_count;
+  END IF;
+  
+  RAISE NOTICE '';
+  RAISE NOTICE '✅ DUPLICATES REMOVED SUCCESSFULLY!';
+  RAISE NOTICE '';
+  
+END $$;
+
+-- ========================================
+-- ШАГ 5: Проверка результата
+-- ========================================
+
+DO $$
+DECLARE
+  total_categories INTEGER;
+  total_subcategories INTEGER;
+BEGIN
+  SELECT COUNT(*) INTO total_categories FROM categories WHERE is_active = TRUE;
+  SELECT COUNT(*) INTO total_subcategories FROM subcategories WHERE is_active = TRUE;
+  
+  RAISE NOTICE '==============================================';
+  RAISE NOTICE 'VERIFICATION';
+  RAISE NOTICE '==============================================';
+  RAISE NOTICE 'Total active categories: %', total_categories;
+  RAISE NOTICE 'Total active subcategories: %', total_subcategories;
+  RAISE NOTICE '';
+END $$;
+
+-- Показать финальный результат
+SELECT 
+  c.name as category_name,
+  c.icon as category_icon,
+  c.order_index,
+  COUNT(sc.id) as subcategory_count
+FROM categories c
+LEFT JOIN subcategories sc ON sc.category_id = c.id
+WHERE c.is_active = TRUE
+GROUP BY c.id, c.name, c.icon, c.order_index
+ORDER BY c.order_index;
+
+COMMIT;
+
+-- ========================================
+-- ГОТОВО!
+-- ========================================
+-- 
+-- Результат:
+-- ✅ Только уникальные категории (7 штук)
+-- ✅ Правильные названия
+-- ✅ Все подкатегории привязаны
+-- ✅ Нет дубликатов
+-- 
+-- ========================================
+
+
+-- ============================================================
+-- Subcategories Migration for MatchVibe
+-- ============================================================
+-- Adds subcategory structure to existing categories
+-- Version: 2.0.0 (FIXED)
+-- Date: 2025-01-09
+-- Fix: Corrected UUID duplicate deletion method
+-- ============================================================
+
+-- ========================================
+-- 1. Create Subcategories Table
+-- ========================================
+
+CREATE TABLE IF NOT EXISTS subcategories (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  category_id UUID NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  description TEXT,
+  icon TEXT,
+  order_index INTEGER NOT NULL DEFAULT 0,
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW()),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW())
+);
+
+-- Add index for faster lookups
+CREATE INDEX IF NOT EXISTS idx_subcategories_category 
+ON subcategories(category_id, is_active, order_index);
+
+-- Enable RLS
+ALTER TABLE subcategories ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policy: Anyone can view active subcategories
+DROP POLICY IF EXISTS "Subcategories are viewable by everyone" ON subcategories;
+CREATE POLICY "Subcategories are viewable by everyone"
+  ON subcategories FOR SELECT
+  USING (is_active = TRUE);
+
+-- ========================================
+-- 2. Update Questions Table
+-- ========================================
+
+-- Add subcategory_id column to questions
+ALTER TABLE questions 
+ADD COLUMN IF NOT EXISTS subcategory_id UUID REFERENCES subcategories(id) ON DELETE SET NULL;
+
+-- Create index for subcategory lookups
+CREATE INDEX IF NOT EXISTS idx_questions_subcategory 
+ON questions(subcategory_id);
+
+-- ========================================
+-- 3. Clean up existing duplicates
+-- ========================================
+
+DO $$
+DECLARE
+  deleted_count INTEGER;
+BEGIN
+  -- Delete duplicate subcategories, keeping only the oldest one
+  -- Using CTE with ROW_NUMBER() because MIN() doesn't work with UUID
+  WITH duplicates_cte AS (
+    SELECT 
+      id,
+      ROW_NUMBER() OVER (
+        PARTITION BY category_id, name 
+        ORDER BY created_at ASC, id
+      ) as row_num
+    FROM subcategories
+  )
+  DELETE FROM subcategories
+  WHERE id IN (
+    SELECT id FROM duplicates_cte WHERE row_num > 1
+  );
+  
+  GET DIAGNOSTICS deleted_count = ROW_COUNT;
+  RAISE NOTICE 'Deleted % duplicate subcategories', deleted_count;
+  
+  -- Now create unique constraint to prevent future duplicates
+  -- Must be created BEFORE inserts for ON CONFLICT to work
+  DROP INDEX IF EXISTS idx_subcategories_unique;
+  CREATE UNIQUE INDEX idx_subcategories_unique 
+  ON subcategories(category_id, name);
+  
+  RAISE NOTICE 'Unique index created - ready for inserts';
+END $$;
+
+-- ========================================
+-- 4. Insert Subcategories Data
+-- ========================================
+
+DO $$
+DECLARE
+  food_cat_id UUID;
+  entertainment_cat_id UUID;
+  animals_cat_id UUID;
+  relationships_cat_id UUID;
+  leisure_cat_id UUID;
+  perception_cat_id UUID;
+  misc_cat_id UUID;
+BEGIN
+  -- Get existing category IDs by icon (more reliable than name)
+  SELECT id INTO food_cat_id FROM categories WHERE icon = '🍕' LIMIT 1;
+  SELECT id INTO entertainment_cat_id FROM categories WHERE icon = '🎬' LIMIT 1;
+  SELECT id INTO animals_cat_id FROM categories WHERE icon = '🐶' LIMIT 1;
+  SELECT id INTO relationships_cat_id FROM categories WHERE icon = '💞' LIMIT 1;
+  SELECT id INTO leisure_cat_id FROM categories WHERE icon = '🏖️' LIMIT 1;
+  
+  -- Try to find by name if icon search failed
+  IF food_cat_id IS NULL THEN
+    SELECT id INTO food_cat_id FROM categories WHERE name ILIKE '%еда%' OR name ILIKE '%food%' LIMIT 1;
+  END IF;
+  
+  IF entertainment_cat_id IS NULL THEN
+    SELECT id INTO entertainment_cat_id FROM categories WHERE name ILIKE '%развлечен%' OR name ILIKE '%фильм%' LIMIT 1;
+  END IF;
+  
+  IF animals_cat_id IS NULL THEN
+    SELECT id INTO animals_cat_id FROM categories WHERE name ILIKE '%животн%' OR name ILIKE '%animal%' LIMIT 1;
+  END IF;
+  
+  IF relationships_cat_id IS NULL THEN
+    SELECT id INTO relationships_cat_id FROM categories WHERE name ILIKE '%отношен%' OR name ILIKE '%личност%' LIMIT 1;
+  END IF;
+  
+  IF leisure_cat_id IS NULL THEN
+    SELECT id INTO leisure_cat_id FROM categories WHERE name ILIKE '%досуг%' OR name ILIKE '%путешеств%' LIMIT 1;
+  END IF;
+  
+  -- If still not found, raise notice
+  IF food_cat_id IS NULL THEN
+    RAISE NOTICE 'WARNING: Food category not found! Please create it first.';
+  END IF;
+  
+  IF entertainment_cat_id IS NULL THEN
+    RAISE NOTICE 'WARNING: Entertainment category not found! Please create it first.';
+  END IF;
+  
+  IF animals_cat_id IS NULL THEN
+    RAISE NOTICE 'WARNING: Animals category not found! Please create it first.';
+  END IF;
+  
+  IF relationships_cat_id IS NULL THEN
+    RAISE NOTICE 'WARNING: Relationships category not found! Please create it first.';
+  END IF;
+  
+  IF leisure_cat_id IS NULL THEN
+    RAISE NOTICE 'WARNING: Leisure category not found! Please create it first.';
+  END IF;
+
+  -- Insert Subcategories (only if category exists)
+
+  -- 🍕 Еда и напитки
+  IF food_cat_id IS NOT NULL THEN
+    INSERT INTO subcategories (category_id, name, order_index) 
+    VALUES
+      (food_cat_id, 'Любимая кухня', 1),
+      (food_cat_id, 'Любимое блюдо', 2),
+      (food_cat_id, 'Кофе / чай', 3),
+      (food_cat_id, 'Десерты', 4),
+      (food_cat_id, 'Уличная еда', 5),
+      (food_cat_id, 'Завтрак мечты', 6),
+      (food_cat_id, 'Ресторан мечты', 7)
+    ON CONFLICT (category_id, name) DO NOTHING;
+    RAISE NOTICE 'Food subcategories: 7 items';
+  END IF;
+
+  -- 🎬 Развлечения и культура
+  IF entertainment_cat_id IS NOT NULL THEN
+    INSERT INTO subcategories (category_id, name, order_index) 
+    VALUES
+      (entertainment_cat_id, 'Любимый фильм', 1),
+      (entertainment_cat_id, 'Любимый жанр кино', 2),
+      (entertainment_cat_id, 'Любимый исполнитель', 3),
+      (entertainment_cat_id, 'Любимая песня', 4),
+      (entertainment_cat_id, 'Сериал, который стоит пересмотреть', 5),
+      (entertainment_cat_id, 'Любимая игра (настольная / видеоигра)', 6),
+      (entertainment_cat_id, 'Самый вдохновляющий фильм', 7)
+    ON CONFLICT (category_id, name) DO NOTHING;
+    RAISE NOTICE 'Entertainment subcategories: 7 items';
+  END IF;
+
+  -- 🐶 Животные
+  IF animals_cat_id IS NOT NULL THEN
+    INSERT INTO subcategories (category_id, name, order_index) 
+    VALUES
+      (animals_cat_id, 'Любимая порода собак', 1),
+      (animals_cat_id, 'Кошки vs собаки', 2),
+      (animals_cat_id, 'Идеальный питомец', 3),
+      (animals_cat_id, 'Дикая природа или домашние любимцы', 4)
+    ON CONFLICT (category_id, name) DO NOTHING;
+    RAISE NOTICE 'Animals subcategories: 4 items';
+  END IF;
+
+  -- 💞 Отношения и личность
+  IF relationships_cat_id IS NOT NULL THEN
+    INSERT INTO subcategories (category_id, name, order_index) 
+    VALUES
+      (relationships_cat_id, 'Главное качество в человеке', 1),
+      (relationships_cat_id, 'Главный страх', 2),
+      (relationships_cat_id, 'Заветная мечта', 3),
+      (relationships_cat_id, 'Отношение к дружбе', 4),
+      (relationships_cat_id, 'Как ты проявляешь заботу', 5),
+      (relationships_cat_id, 'Любимый тип отдыха вдвоем', 6)
+    ON CONFLICT (category_id, name) DO NOTHING;
+    RAISE NOTICE 'Relationships subcategories: 6 items';
+  END IF;
+
+  -- 🏖️ Досуг и путешествия
+  IF leisure_cat_id IS NOT NULL THEN
+    INSERT INTO subcategories (category_id, name, order_index) 
+    VALUES
+      (leisure_cat_id, 'Любимое место отдыха', 1),
+      (leisure_cat_id, 'Идеальное путешествие', 2),
+      (leisure_cat_id, 'Активный отдых или релакс', 3),
+      (leisure_cat_id, 'Город мечты', 4),
+      (leisure_cat_id, 'Идеальный выходной', 5)
+    ON CONFLICT (category_id, name) DO NOTHING;
+    RAISE NOTICE 'Leisure subcategories: 5 items';
+  END IF;
+
+  RAISE NOTICE '✅ Subcategories created successfully!';
+END $$;
+
+-- ========================================
+-- 5. Verification
+-- ========================================
+
+-- Check subcategories count
+DO $$
+DECLARE
+  subcat_count INTEGER;
+BEGIN
+  SELECT COUNT(*) INTO subcat_count FROM subcategories;
+  RAISE NOTICE 'Total subcategories: %', subcat_count;
+END $$;
+
+-- Show subcategories grouped by category
+SELECT 
+  c.name as category_name,
+  c.icon as category_icon,
+  COUNT(sc.id) as subcategory_count
+FROM categories c
+LEFT JOIN subcategories sc ON sc.category_id = c.id
+GROUP BY c.id, c.name, c.icon, c.order_index
+ORDER BY c.order_index;
+
+-- ============================================================
+-- Subcategories Migration for MatchVibe
+-- ============================================================
+-- Adds subcategory structure to existing categories
+-- Version: 2.0.0 (FIXED)
+-- Date: 2025-01-09
+-- Fix: Corrected UUID duplicate deletion method
+-- ============================================================
+
+-- ========================================
+-- 1. Create Subcategories Table
+-- ========================================
+
+CREATE TABLE IF NOT EXISTS subcategories (
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  category_id UUID NOT NULL REFERENCES categories(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  description TEXT,
+  icon TEXT,
+  order_index INTEGER NOT NULL DEFAULT 0,
+  is_active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW()),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT TIMEZONE('utc', NOW())
+);
+
+-- Add index for faster lookups
+CREATE INDEX IF NOT EXISTS idx_subcategories_category 
+ON subcategories(category_id, is_active, order_index);
+
+-- Enable RLS
+ALTER TABLE subcategories ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policy: Anyone can view active subcategories
+DROP POLICY IF EXISTS "Subcategories are viewable by everyone" ON subcategories;
+CREATE POLICY "Subcategories are viewable by everyone"
+  ON subcategories FOR SELECT
+  USING (is_active = TRUE);
+
+-- ========================================
+-- 2. Update Questions Table
+-- ========================================
+
+-- Add subcategory_id column to questions
+ALTER TABLE questions 
+ADD COLUMN IF NOT EXISTS subcategory_id UUID REFERENCES subcategories(id) ON DELETE SET NULL;
+
+-- Create index for subcategory lookups
+CREATE INDEX IF NOT EXISTS idx_questions_subcategory 
+ON questions(subcategory_id);
+
+-- ========================================
+-- 3. Clean up existing duplicates
+-- ========================================
+
+DO $$
+DECLARE
+  deleted_count INTEGER;
+BEGIN
+  -- Delete duplicate subcategories, keeping only the oldest one
+  -- Using CTE with ROW_NUMBER() because MIN() doesn't work with UUID
+  WITH duplicates_cte AS (
+    SELECT 
+      id,
+      ROW_NUMBER() OVER (
+        PARTITION BY category_id, name 
+        ORDER BY created_at ASC, id
+      ) as row_num
+    FROM subcategories
+  )
+  DELETE FROM subcategories
+  WHERE id IN (
+    SELECT id FROM duplicates_cte WHERE row_num > 1
+  );
+  
+  GET DIAGNOSTICS deleted_count = ROW_COUNT;
+  RAISE NOTICE 'Deleted % duplicate subcategories', deleted_count;
+  
+  -- Now create unique constraint to prevent future duplicates
+  -- Must be created BEFORE inserts for ON CONFLICT to work
+  DROP INDEX IF EXISTS idx_subcategories_unique;
+  CREATE UNIQUE INDEX idx_subcategories_unique 
+  ON subcategories(category_id, name);
+  
+  RAISE NOTICE 'Unique index created - ready for inserts';
+END $$;
+
+-- ========================================
+-- 4. Insert Subcategories Data
+-- ========================================
+
+DO $$
+DECLARE
+  food_cat_id UUID;
+  entertainment_cat_id UUID;
+  animals_cat_id UUID;
+  relationships_cat_id UUID;
+  leisure_cat_id UUID;
+  perception_cat_id UUID;
+  misc_cat_id UUID;
+BEGIN
+  -- Get existing category IDs by icon (more reliable than name)
+  SELECT id INTO food_cat_id FROM categories WHERE icon = '🍕' LIMIT 1;
+  SELECT id INTO entertainment_cat_id FROM categories WHERE icon = '🎬' LIMIT 1;
+  SELECT id INTO animals_cat_id FROM categories WHERE icon = '🐶' LIMIT 1;
+  SELECT id INTO relationships_cat_id FROM categories WHERE icon = '💞' LIMIT 1;
+  SELECT id INTO leisure_cat_id FROM categories WHERE icon = '🏖️' LIMIT 1;
+  
+  -- Try to find by name if icon search failed
+  IF food_cat_id IS NULL THEN
+    SELECT id INTO food_cat_id FROM categories WHERE name ILIKE '%еда%' OR name ILIKE '%food%' LIMIT 1;
+  END IF;
+  
+  IF entertainment_cat_id IS NULL THEN
+    SELECT id INTO entertainment_cat_id FROM categories WHERE name ILIKE '%развлечен%' OR name ILIKE '%фильм%' LIMIT 1;
+  END IF;
+  
+  IF animals_cat_id IS NULL THEN
+    SELECT id INTO animals_cat_id FROM categories WHERE name ILIKE '%животн%' OR name ILIKE '%animal%' LIMIT 1;
+  END IF;
+  
+  IF relationships_cat_id IS NULL THEN
+    SELECT id INTO relationships_cat_id FROM categories WHERE name ILIKE '%отношен%' OR name ILIKE '%личност%' LIMIT 1;
+  END IF;
+  
+  IF leisure_cat_id IS NULL THEN
+    SELECT id INTO leisure_cat_id FROM categories WHERE name ILIKE '%досуг%' OR name ILIKE '%путешеств%' LIMIT 1;
+  END IF;
+  
+  -- If still not found, raise notice
+  IF food_cat_id IS NULL THEN
+    RAISE NOTICE 'WARNING: Food category not found! Please create it first.';
+  END IF;
+  
+  IF entertainment_cat_id IS NULL THEN
+    RAISE NOTICE 'WARNING: Entertainment category not found! Please create it first.';
+  END IF;
+  
+  IF animals_cat_id IS NULL THEN
+    RAISE NOTICE 'WARNING: Animals category not found! Please create it first.';
+  END IF;
+  
+  IF relationships_cat_id IS NULL THEN
+    RAISE NOTICE 'WARNING: Relationships category not found! Please create it first.';
+  END IF;
+  
+  IF leisure_cat_id IS NULL THEN
+    RAISE NOTICE 'WARNING: Leisure category not found! Please create it first.';
+  END IF;
+
+  -- Insert Subcategories (only if category exists)
+
+  -- 🍕 Еда и напитки
+  IF food_cat_id IS NOT NULL THEN
+    INSERT INTO subcategories (category_id, name, order_index) 
+    VALUES
+      (food_cat_id, 'Любимая кухня', 1),
+      (food_cat_id, 'Любимое блюдо', 2),
+      (food_cat_id, 'Кофе / чай', 3),
+      (food_cat_id, 'Десерты', 4),
+      (food_cat_id, 'Уличная еда', 5),
+      (food_cat_id, 'Завтрак мечты', 6),
+      (food_cat_id, 'Ресторан мечты', 7)
+    ON CONFLICT (category_id, name) DO NOTHING;
+    RAISE NOTICE 'Food subcategories: 7 items';
+  END IF;
+
+  -- 🎬 Развлечения и культура
+  IF entertainment_cat_id IS NOT NULL THEN
+    INSERT INTO subcategories (category_id, name, order_index) 
+    VALUES
+      (entertainment_cat_id, 'Любимый фильм', 1),
+      (entertainment_cat_id, 'Любимый жанр кино', 2),
+      (entertainment_cat_id, 'Любимый исполнитель', 3),
+      (entertainment_cat_id, 'Любимая песня', 4),
+      (entertainment_cat_id, 'Сериал, который стоит пересмотреть', 5),
+      (entertainment_cat_id, 'Любимая игра (настольная / видеоигра)', 6),
+      (entertainment_cat_id, 'Самый вдохновляющий фильм', 7)
+    ON CONFLICT (category_id, name) DO NOTHING;
+    RAISE NOTICE 'Entertainment subcategories: 7 items';
+  END IF;
+
+  -- 🐶 Животные
+  IF animals_cat_id IS NOT NULL THEN
+    INSERT INTO subcategories (category_id, name, order_index) 
+    VALUES
+      (animals_cat_id, 'Любимая порода собак', 1),
+      (animals_cat_id, 'Кошки vs собаки', 2),
+      (animals_cat_id, 'Идеальный питомец', 3),
+      (animals_cat_id, 'Дикая природа или домашние любимцы', 4)
+    ON CONFLICT (category_id, name) DO NOTHING;
+    RAISE NOTICE 'Animals subcategories: 4 items';
+  END IF;
+
+  -- 💞 Отношения и личность
+  IF relationships_cat_id IS NOT NULL THEN
+    INSERT INTO subcategories (category_id, name, order_index) 
+    VALUES
+      (relationships_cat_id, 'Главное качество в человеке', 1),
+      (relationships_cat_id, 'Главный страх', 2),
+      (relationships_cat_id, 'Заветная мечта', 3),
+      (relationships_cat_id, 'Отношение к дружбе', 4),
+      (relationships_cat_id, 'Как ты проявляешь заботу', 5),
+      (relationships_cat_id, 'Любимый тип отдыха вдвоем', 6)
+    ON CONFLICT (category_id, name) DO NOTHING;
+    RAISE NOTICE 'Relationships subcategories: 6 items';
+  END IF;
+
+  -- 🏖️ Досуг и путешествия
+  IF leisure_cat_id IS NOT NULL THEN
+    INSERT INTO subcategories (category_id, name, order_index) 
+    VALUES
+      (leisure_cat_id, 'Любимое место отдыха', 1),
+      (leisure_cat_id, 'Идеальное путешествие', 2),
+      (leisure_cat_id, 'Активный отдых или релакс', 3),
+      (leisure_cat_id, 'Город мечты', 4),
+      (leisure_cat_id, 'Идеальный выходной', 5)
+    ON CONFLICT (category_id, name) DO NOTHING;
+    RAISE NOTICE 'Leisure subcategories: 5 items';
+  END IF;
+
+  RAISE NOTICE '✅ Subcategories created successfully!';
+END $$;
+
+-- ========================================
+-- 5. Verification
+-- ========================================
+
+-- Check subcategories count
+DO $$
+DECLARE
+  subcat_count INTEGER;
+BEGIN
+  SELECT COUNT(*) INTO subcat_count FROM subcategories;
+  RAISE NOTICE 'Total subcategories: %', subcat_count;
+END $$;
+
+-- Show subcategories grouped by category
+SELECT 
+  c.name as category_name,
+  c.icon as category_icon,
+  COUNT(sc.id) as subcategory_count
+FROM categories c
+LEFT JOIN subcategories sc ON sc.category_id = c.id
+GROUP BY c.id, c.name, c.icon, c.order_index
+ORDER BY c.order_index;
+
+WITH duplicates_cte AS (
+  SELECT 
+    id,
+    ROW_NUMBER() OVER (
+      PARTITION BY text, category_id 
+      ORDER BY created_at ASC, id
+    ) as row_num
+  FROM questions
+  WHERE is_active = true
+)
+DELETE FROM questions
+WHERE id IN (
+  SELECT id FROM duplicates_cte WHERE row_num > 1
+);
+
+-- Part 1: Еда и напитки (105 вопросов)
+DO $$ 
+DECLARE v_id UUID;
+BEGIN
+  -- 1.1 Любимая кухня
+  SELECT id INTO v_id FROM subcategories WHERE name='Любимая кухня' LIMIT 1;
+  IF v_id IS NOT NULL THEN
+    INSERT INTO questions(subcategory_id,text,image_url,order_index) VALUES
+    (v_id,'Итальянская','/images/subcategories/food-favorite-cuisine/card-1.jpg',1),
+    (v_id,'Японская','/images/subcategories/food-favorite-cuisine/card-2.jpg',2),
+    (v_id,'Мексиканская','/images/subcategories/food-favorite-cuisine/card-3.jpg',3),
+    (v_id,'Французская','/images/subcategories/food-favorite-cuisine/card-4.jpg',4),
+    (v_id,'Китайская','/images/subcategories/food-favorite-cuisine/card-5.jpg',5),
+    (v_id,'Индийская','/images/subcategories/food-favorite-cuisine/card-6.jpg',6),
+    (v_id,'Тайская','/images/subcategories/food-favorite-cuisine/card-7.jpg',7),
+    (v_id,'Грузинская','/images/subcategories/food-favorite-cuisine/card-8.jpg',8),
+    (v_id,'Средиземноморская','/images/subcategories/food-favorite-cuisine/card-9.jpg',9),
+    (v_id,'Корейская','/images/subcategories/food-favorite-cuisine/card-10.jpg',10),
+    (v_id,'Вьетнамская','/images/subcategories/food-favorite-cuisine/card-11.jpg',11),
+    (v_id,'Турецкая','/images/subcategories/food-favorite-cuisine/card-12.jpg',12),
+    (v_id,'Испанская','/images/subcategories/food-favorite-cuisine/card-13.jpg',13),
+    (v_id,'Русская','/images/subcategories/food-favorite-cuisine/card-14.jpg',14),
+    (v_id,'Американская','/images/subcategories/food-favorite-cuisine/card-15.jpg',15)
+    ON CONFLICT DO NOTHING;
+    RAISE NOTICE '✅ Любимая кухня: 15';
+  END IF;
+
+  -- 1.2 Любимое блюдо
+  SELECT id INTO v_id FROM subcategories WHERE name='Любимое блюдо' LIMIT 1;
+  IF v_id IS NOT NULL THEN
+    INSERT INTO questions(subcategory_id,text,image_url,order_index) VALUES
+    (v_id,'Пицца Маргарита','/images/subcategories/food-favorite-dish/card-1.jpg',1),
+    (v_id,'Борщ','/images/subcategories/food-favorite-dish/card-2.jpg',2),
+    (v_id,'Паста Карбонара','/images/subcategories/food-favorite-dish/card-3.jpg',3),
+    (v_id,'Суши Сет','/images/subcategories/food-favorite-dish/card-4.jpg',4),
+    (v_id,'Стейк Рибай','/images/subcategories/food-favorite-dish/card-5.jpg',5),
+    (v_id,'Рамен','/images/subcategories/food-favorite-dish/card-6.jpg',6),
+    (v_id,'Лазанья','/images/subcategories/food-favorite-dish/card-7.jpg',7),
+    (v_id,'Хачапури','/images/subcategories/food-favorite-dish/card-8.jpg',8),
+    (v_id,'Пельмени','/images/subcategories/food-favorite-dish/card-9.jpg',9),
+    (v_id,'Бургер','/images/subcategories/food-favorite-dish/card-10.jpg',10),
+    (v_id,'Ризотто','/images/subcategories/food-favorite-dish/card-11.jpg',11),
+    (v_id,'Шашлык','/images/subcategories/food-favorite-dish/card-12.jpg',12),
+    (v_id,'Плов','/images/subcategories/food-favorite-dish/card-13.jpg',13),
+    (v_id,'Том Ям','/images/subcategories/food-favorite-dish/card-14.jpg',14),
+    (v_id,'Утка по-пекински','/images/subcategories/food-favorite-dish/card-15.jpg',15)
+    ON CONFLICT DO NOTHING;
+    RAISE NOTICE '✅ Любимое блюдо: 15';
+  END IF;
+
+  -- 1.3 Кофе / чай
+  SELECT id INTO v_id FROM subcategories WHERE name='Кофе / чай' LIMIT 1;
+  IF v_id IS NOT NULL THEN
+    INSERT INTO questions(subcategory_id,text,image_url,order_index) VALUES
+    (v_id,'Эспрессо','/images/subcategories/food-coffee-tea/card-1.jpg',1),
+    (v_id,'Капучино','/images/subcategories/food-coffee-tea/card-2.jpg',2),
+    (v_id,'Латте','/images/subcategories/food-coffee-tea/card-3.jpg',3),
+    (v_id,'Черный чай','/images/subcategories/food-coffee-tea/card-4.jpg',4),
+    (v_id,'Зеленый чай','/images/subcategories/food-coffee-tea/card-5.jpg',5),
+    (v_id,'Матча','/images/subcategories/food-coffee-tea/card-6.jpg',6),
+    (v_id,'Американо','/images/subcategories/food-coffee-tea/card-7.jpg',7),
+    (v_id,'Флэт Уайт','/images/subcategories/food-coffee-tea/card-8.jpg',8),
+    (v_id,'Раф','/images/subcategories/food-coffee-tea/card-9.jpg',9),
+    (v_id,'Травяной чай','/images/subcategories/food-coffee-tea/card-10.jpg',10),
+    (v_id,'Фраппучино','/images/subcategories/food-coffee-tea/card-11.jpg',11),
+    (v_id,'Масала чай','/images/subcategories/food-coffee-tea/card-12.jpg',12),
+    (v_id,'Турецкий кофе','/images/subcategories/food-coffee-tea/card-13.jpg',13),
+    (v_id,'Пуэр','/images/subcategories/food-coffee-tea/card-14.jpg',14),
+    (v_id,'Колд брю','/images/subcategories/food-coffee-tea/card-15.jpg',15)
+    ON CONFLICT DO NOTHING;
+    RAISE NOTICE '✅ Кофе / чай: 15';
+  END IF;
+
+  -- 1.4 Десерты
+  SELECT id INTO v_id FROM subcategories WHERE name='Десерты' LIMIT 1;
+  IF v_id IS NOT NULL THEN
+    INSERT INTO questions(subcategory_id,text,image_url,order_index) VALUES
+    (v_id,'Тирамису','/images/subcategories/food-desserts/card-1.jpg',1),
+    (v_id,'Чизкейк','/images/subcategories/food-desserts/card-2.jpg',2),
+    (v_id,'Брауни','/images/subcategories/food-desserts/card-3.jpg',3),
+    (v_id,'Макаруны','/images/subcategories/food-desserts/card-4.jpg',4),
+    (v_id,'Эклеры','/images/subcategories/food-desserts/card-5.jpg',5),
+    (v_id,'Панна-котта','/images/subcategories/food-desserts/card-6.jpg',6),
+    (v_id,'Медовик','/images/subcategories/food-desserts/card-7.jpg',7),
+    (v_id,'Профитроли','/images/subcategories/food-desserts/card-8.jpg',8),
+    (v_id,'Павлова','/images/subcategories/food-desserts/card-9.jpg',9),
+    (v_id,'Штрудель','/images/subcategories/food-desserts/card-10.jpg',10),
+    (v_id,'Крем-брюле','/images/subcategories/food-desserts/card-11.jpg',11),
+    (v_id,'Наполеон','/images/subcategories/food-desserts/card-12.jpg',12),
+    (v_id,'Пахлава','/images/subcategories/food-desserts/card-13.jpg',13),
+    (v_id,'Маффины','/images/subcategories/food-desserts/card-14.jpg',14),
+    (v_id,'Мороженое','/images/subcategories/food-desserts/card-15.jpg',15)
+    ON CONFLICT DO NOTHING;
+    RAISE NOTICE '✅ Десерты: 15';
+  END IF;
+
+  -- 1.5 Уличная еда
+  SELECT id INTO v_id FROM subcategories WHERE name='Уличная еда' LIMIT 1;
+  IF v_id IS NOT NULL THEN
+    INSERT INTO questions(subcategory_id,text,image_url,order_index) VALUES
+    (v_id,'Хот-дог','/images/subcategories/food-street-food/card-1.jpg',1),
+    (v_id,'Шаурма','/images/subcategories/food-street-food/card-2.jpg',2),
+    (v_id,'Тако','/images/subcategories/food-street-food/card-3.jpg',3),
+    (v_id,'Бургер','/images/subcategories/food-street-food/card-4.jpg',4),
+    (v_id,'Корн-дог','/images/subcategories/food-street-food/card-5.jpg',5),
+    (v_id,'Фалафель','/images/subcategories/food-street-food/card-6.jpg',6),
+    (v_id,'Пирожок','/images/subcategories/food-street-food/card-7.jpg',7),
+    (v_id,'Чебурек','/images/subcategories/food-street-food/card-8.jpg',8),
+    (v_id,'Бань-ми','/images/subcategories/food-street-food/card-9.jpg',9),
+    (v_id,'Сэндвич','/images/subcategories/food-street-food/card-10.jpg',10),
+    (v_id,'Самса','/images/subcategories/food-street-food/card-11.jpg',11),
+    (v_id,'Вафли','/images/subcategories/food-street-food/card-12.jpg',12),
+    (v_id,'Блины','/images/subcategories/food-street-food/card-13.jpg',13),
+    (v_id,'Пицца кусочек','/images/subcategories/food-street-food/card-14.jpg',14),
+    (v_id,'Картофель фри','/images/subcategories/food-street-food/card-15.jpg',15)
+    ON CONFLICT DO NOTHING;
+    RAISE NOTICE '✅ Уличная еда: 15';
+  END IF;
+
+  -- 1.6 Завтрак мечты
+  SELECT id INTO v_id FROM subcategories WHERE name='Завтрак мечты' LIMIT 1;
+  IF v_id IS NOT NULL THEN
+    INSERT INTO questions(subcategory_id,text,image_url,order_index) VALUES
+    (v_id,'Панкейки с ягодами','/images/subcategories/food-dream-breakfast/card-1.jpg',1),
+    (v_id,'Круассаны','/images/subcategories/food-dream-breakfast/card-2.jpg',2),
+    (v_id,'Яичница с беконом','/images/subcategories/food-dream-breakfast/card-3.jpg',3),
+    (v_id,'Авокадо тост','/images/subcategories/food-dream-breakfast/card-4.jpg',4),
+    (v_id,'Овсянка с фруктами','/images/subcategories/food-dream-breakfast/card-5.jpg',5),
+    (v_id,'Бельгийские вафли','/images/subcategories/food-dream-breakfast/card-6.jpg',6),
+    (v_id,'Омлет','/images/subcategories/food-dream-breakfast/card-7.jpg',7),
+    (v_id,'Гранола с йогуртом','/images/subcategories/food-dream-breakfast/card-8.jpg',8),
+    (v_id,'Бейглы с лососем','/images/subcategories/food-dream-breakfast/card-9.jpg',9),
+    (v_id,'Французские тосты','/images/subcategories/food-dream-breakfast/card-10.jpg',10),
+    (v_id,'Сырники','/images/subcategories/food-dream-breakfast/card-11.jpg',11),
+    (v_id,'Смузи боул','/images/subcategories/food-dream-breakfast/card-12.jpg',12),
+    (v_id,'Английский завтрак','/images/subcategories/food-dream-breakfast/card-13.jpg',13),
+    (v_id,'Шакшука','/images/subcategories/food-dream-breakfast/card-14.jpg',14),
+    (v_id,'Блинчики','/images/subcategories/food-dream-breakfast/card-15.jpg',15)
+    ON CONFLICT DO NOTHING;
+    RAISE NOTICE '✅ Завтрак мечты: 15';
+  END IF;
+
+  -- 1.7 Ресторан мечты
+  SELECT id INTO v_id FROM subcategories WHERE name='Ресторан мечты' LIMIT 1;
+  IF v_id IS NOT NULL THEN
+    INSERT INTO questions(subcategory_id,text,image_url,order_index) VALUES
+    (v_id,'Мишленовский ресторан','/images/subcategories/food-dream-restaurant/card-1.jpg',1),
+    (v_id,'Панорамный ресторан','/images/subcategories/food-dream-restaurant/card-2.jpg',2),
+    (v_id,'Ресторан у моря','/images/subcategories/food-dream-restaurant/card-3.jpg',3),
+    (v_id,'Японский ресторан','/images/subcategories/food-dream-restaurant/card-4.jpg',4),
+    (v_id,'Итальянская траттория','/images/subcategories/food-dream-restaurant/card-5.jpg',5),
+    (v_id,'Стейк-хаус','/images/subcategories/food-dream-restaurant/card-6.jpg',6),
+    (v_id,'Веганский ресторан','/images/subcategories/food-dream-restaurant/card-7.jpg',7),
+    (v_id,'Молекулярная кухня','/images/subcategories/food-dream-restaurant/card-8.jpg',8),
+    (v_id,'Ресторан на воде','/images/subcategories/food-dream-restaurant/card-9.jpg',9),
+    (v_id,'Ресторан в замке','/images/subcategories/food-dream-restaurant/card-10.jpg',10),
+    (v_id,'Тематический ресторан','/images/subcategories/food-dream-restaurant/card-11.jpg',11),
+    (v_id,'Гастропаб','/images/subcategories/food-dream-restaurant/card-12.jpg',12),
+    (v_id,'Ресторан в саду','/images/subcategories/food-dream-restaurant/card-13.jpg',13),
+    (v_id,'Семейный ресторан','/images/subcategories/food-dream-restaurant/card-14.jpg',14),
+    (v_id,'Футуристический','/images/subcategories/food-dream-restaurant/card-15.jpg',15)
+    ON CONFLICT DO NOTHING;
+    RAISE NOTICE '✅ Ресторан мечты: 15';
+  END IF;
+
+  RAISE NOTICE '🍕 Еда и напитки: 105 вопросов добавлено';
+END $$;
+
+-- Part 2: Развлечения и культура (105 вопросов)
+DO $$ 
+DECLARE v_id UUID;
+BEGIN
+  -- 2.1 Любимый фильм
+  SELECT id INTO v_id FROM subcategories WHERE name='Любимый фильм' LIMIT 1;
+  IF v_id IS NOT NULL THEN
+    INSERT INTO questions(subcategory_id,text,image_url,order_index) VALUES
+    (v_id,'Криминальное чтиво','/images/subcategories/entertainment-favorite-movie/card-1.jpg',1),
+    (v_id,'Начало','/images/subcategories/entertainment-favorite-movie/card-2.jpg',2),
+    (v_id,'Бойцовский клуб','/images/subcategories/entertainment-favorite-movie/card-3.jpg',3),
+    (v_id,'Форрест Гамп','/images/subcategories/entertainment-favorite-movie/card-4.jpg',4),
+    (v_id,'Матрица','/images/subcategories/entertainment-favorite-movie/card-5.jpg',5),
+    (v_id,'Титаник','/images/subcategories/entertainment-favorite-movie/card-6.jpg',6),
+    (v_id,'Зеленая миля','/images/subcategories/entertainment-favorite-movie/card-7.jpg',7),
+    (v_id,'Интерстеллар','/images/subcategories/entertainment-favorite-movie/card-8.jpg',8),
+    (v_id,'Крестный отец','/images/subcategories/entertainment-favorite-movie/card-9.jpg',9),
+    (v_id,'Темный рыцарь','/images/subcategories/entertainment-favorite-movie/card-10.jpg',10),
+    (v_id,'1+1','/images/subcategories/entertainment-favorite-movie/card-11.jpg',11),
+    (v_id,'Побег из Шоушенка','/images/subcategories/entertainment-favorite-movie/card-12.jpg',12),
+    (v_id,'Леон','/images/subcategories/entertainment-favorite-movie/card-13.jpg',13),
+    (v_id,'Властелин колец','/images/subcategories/entertainment-favorite-movie/card-14.jpg',14),
+    (v_id,'Джокер','/images/subcategories/entertainment-favorite-movie/card-15.jpg',15)
+    ON CONFLICT DO NOTHING;
+    RAISE NOTICE '✅ Любимый фильм: 15';
+  END IF;
+
+  -- 2.2 Любимый жанр кино
+  SELECT id INTO v_id FROM subcategories WHERE name='Любимый жанр кино' LIMIT 1;
+  IF v_id IS NOT NULL THEN
+    INSERT INTO questions(subcategory_id,text,image_url,order_index) VALUES
+    (v_id,'Комедии','/images/subcategories/entertainment-movie-genre/card-1.jpg',1),
+    (v_id,'Боевики','/images/subcategories/entertainment-movie-genre/card-2.jpg',2),
+    (v_id,'Романтика','/images/subcategories/entertainment-movie-genre/card-3.jpg',3),
+    (v_id,'Ужасы','/images/subcategories/entertainment-movie-genre/card-4.jpg',4),
+    (v_id,'Научная фантастика','/images/subcategories/entertainment-movie-genre/card-5.jpg',5),
+    (v_id,'Фэнтези','/images/subcategories/entertainment-movie-genre/card-6.jpg',6),
+    (v_id,'Документальные','/images/subcategories/entertainment-movie-genre/card-7.jpg',7),
+    (v_id,'Драма','/images/subcategories/entertainment-movie-genre/card-8.jpg',8),
+    (v_id,'Триллеры','/images/subcategories/entertainment-movie-genre/card-9.jpg',9),
+    (v_id,'Анимация','/images/subcategories/entertainment-movie-genre/card-10.jpg',10),
+    (v_id,'Детективы','/images/subcategories/entertainment-movie-genre/card-11.jpg',11),
+    (v_id,'Мюзиклы','/images/subcategories/entertainment-movie-genre/card-12.jpg',12),
+    (v_id,'Приключения','/images/subcategories/entertainment-movie-genre/card-13.jpg',13),
+    (v_id,'Биографии','/images/subcategories/entertainment-movie-genre/card-14.jpg',14),
+    (v_id,'Артхаус','/images/subcategories/entertainment-movie-genre/card-15.jpg',15)
+    ON CONFLICT DO NOTHING;
+    RAISE NOTICE '✅ Любимый жанр кино: 15';
+  END IF;
+
+  -- 2.3 Любимый исполнитель
+  SELECT id INTO v_id FROM subcategories WHERE name='Любимый исполнитель' LIMIT 1;
+  IF v_id IS NOT NULL THEN
+    INSERT INTO questions(subcategory_id,text,image_url,order_index) VALUES
+    (v_id,'Рок-группа','/images/subcategories/entertainment-favorite-artist/card-1.jpg',1),
+    (v_id,'Поп-звезда','/images/subcategories/entertainment-favorite-artist/card-2.jpg',2),
+    (v_id,'Рэп-исполнитель','/images/subcategories/entertainment-favorite-artist/card-3.jpg',3),
+    (v_id,'Джазовый музыкант','/images/subcategories/entertainment-favorite-artist/card-4.jpg',4),
+    (v_id,'Электронный DJ','/images/subcategories/entertainment-favorite-artist/card-5.jpg',5),
+    (v_id,'Классический композитор','/images/subcategories/entertainment-favorite-artist/card-6.jpg',6),
+    (v_id,'Инди-группа','/images/subcategories/entertainment-favorite-artist/card-7.jpg',7),
+    (v_id,'Кантри-певец','/images/subcategories/entertainment-favorite-artist/card-8.jpg',8),
+    (v_id,'Метал-группа','/images/subcategories/entertainment-favorite-artist/card-9.jpg',9),
+    (v_id,'R&B исполнитель','/images/subcategories/entertainment-favorite-artist/card-10.jpg',10),
+    (v_id,'Фолк-музыкант','/images/subcategories/entertainment-favorite-artist/card-11.jpg',11),
+    (v_id,'Регги-артист','/images/subcategories/entertainment-favorite-artist/card-12.jpg',12),
+    (v_id,'Блюз-исполнитель','/images/subcategories/entertainment-favorite-artist/card-13.jpg',13),
+    (v_id,'K-Pop группа','/images/subcategories/entertainment-favorite-artist/card-14.jpg',14),
+    (v_id,'Оперный певец','/images/subcategories/entertainment-favorite-artist/card-15.jpg',15)
+    ON CONFLICT DO NOTHING;
+    RAISE NOTICE '✅ Любимый исполнитель: 15';
+  END IF;
+
+  -- 2.4 Любимая песня
+  SELECT id INTO v_id FROM subcategories WHERE name='Любимая песня' LIMIT 1;
+  IF v_id IS NOT NULL THEN
+    INSERT INTO questions(subcategory_id,text,image_url,order_index) VALUES
+    (v_id,'Рок-баллада','/images/subcategories/entertainment-favorite-song/card-1.jpg',1),
+    (v_id,'Танцевальный хит','/images/subcategories/entertainment-favorite-song/card-2.jpg',2),
+    (v_id,'Романтическая песня','/images/subcategories/entertainment-favorite-song/card-3.jpg',3),
+    (v_id,'Гимн поколения','/images/subcategories/entertainment-favorite-song/card-4.jpg',4),
+    (v_id,'Летний хит','/images/subcategories/entertainment-favorite-song/card-5.jpg',5),
+    (v_id,'Грустная песня','/images/subcategories/entertainment-favorite-song/card-6.jpg',6),
+    (v_id,'Мотивирующий трек','/images/subcategories/entertainment-favorite-song/card-7.jpg',7),
+    (v_id,'Ретро-хит','/images/subcategories/entertainment-favorite-song/card-8.jpg',8),
+    (v_id,'Рэп-трек','/images/subcategories/entertainment-favorite-song/card-9.jpg',9),
+    (v_id,'Электронный трек','/images/subcategories/entertainment-favorite-song/card-10.jpg',10),
+    (v_id,'Джазовая композиция','/images/subcategories/entertainment-favorite-song/card-11.jpg',11),
+    (v_id,'Акустическая песня','/images/subcategories/entertainment-favorite-song/card-12.jpg',12),
+    (v_id,'Песня из фильма','/images/subcategories/entertainment-favorite-song/card-13.jpg',13),
+    (v_id,'Кавер-версия','/images/subcategories/entertainment-favorite-song/card-14.jpg',14),
+    (v_id,'Инструментальная','/images/subcategories/entertainment-favorite-song/card-15.jpg',15)
+    ON CONFLICT DO NOTHING;
+    RAISE NOTICE '✅ Любимая песня: 15';
+  END IF;
+
+  -- 2.5 Сериал, который стоит пересмотреть
+  SELECT id INTO v_id FROM subcategories WHERE name='Сериал, который стоит пересмотреть' LIMIT 1;
+  IF v_id IS NOT NULL THEN
+    INSERT INTO questions(subcategory_id,text,image_url,order_index) VALUES
+    (v_id,'Игра престолов','/images/subcategories/entertainment-series/card-1.jpg',1),
+    (v_id,'Друзья','/images/subcategories/entertainment-series/card-2.jpg',2),
+    (v_id,'Во все тяжкие','/images/subcategories/entertainment-series/card-3.jpg',3),
+    (v_id,'Шерлок','/images/subcategories/entertainment-series/card-4.jpg',4),
+    (v_id,'Офис','/images/subcategories/entertainment-series/card-5.jpg',5),
+    (v_id,'Странные дела','/images/subcategories/entertainment-series/card-6.jpg',6),
+    (v_id,'Черное зеркало','/images/subcategories/entertainment-series/card-7.jpg',7),
+    (v_id,'Теория большого взрыва','/images/subcategories/entertainment-series/card-8.jpg',8),
+    (v_id,'Корона','/images/subcategories/entertainment-series/card-9.jpg',9),
+    (v_id,'Мандалорец','/images/subcategories/entertainment-series/card-10.jpg',10),
+    (v_id,'Ведьмак','/images/subcategories/entertainment-series/card-11.jpg',11),
+    (v_id,'Бумажный дом','/images/subcategories/entertainment-series/card-12.jpg',12),
+    (v_id,'Ривердейл','/images/subcategories/entertainment-series/card-13.jpg',13),
+    (v_id,'Викинги','/images/subcategories/entertainment-series/card-14.jpg',14),
+    (v_id,'Карточный домик','/images/subcategories/entertainment-series/card-15.jpg',15)
+    ON CONFLICT DO NOTHING;
+    RAISE NOTICE '✅ Сериал: 15';
+  END IF;
+
+  -- 2.6 Любимая игра (настольная / видеоигра)
+  SELECT id INTO v_id FROM subcategories WHERE name='Любимая игра (настольная / видеоигра)' LIMIT 1;
+  IF v_id IS NOT NULL THEN
+    INSERT INTO questions(subcategory_id,text,image_url,order_index) VALUES
+    (v_id,'Монополия','/images/subcategories/entertainment-favorite-game/card-1.jpg',1),
+    (v_id,'Шахматы','/images/subcategories/entertainment-favorite-game/card-2.jpg',2),
+    (v_id,'Мафия','/images/subcategories/entertainment-favorite-game/card-3.jpg',3),
+    (v_id,'GTA','/images/subcategories/entertainment-favorite-game/card-4.jpg',4),
+    (v_id,'FIFA','/images/subcategories/entertainment-favorite-game/card-5.jpg',5),
+    (v_id,'Minecraft','/images/subcategories/entertainment-favorite-game/card-6.jpg',6),
+    (v_id,'The Witcher','/images/subcategories/entertainment-favorite-game/card-7.jpg',7),
+    (v_id,'CS:GO','/images/subcategories/entertainment-favorite-game/card-8.jpg',8),
+    (v_id,'Покер','/images/subcategories/entertainment-favorite-game/card-9.jpg',9),
+    (v_id,'Dota 2','/images/subcategories/entertainment-favorite-game/card-10.jpg',10),
+    (v_id,'Каркассон','/images/subcategories/entertainment-favorite-game/card-11.jpg',11),
+    (v_id,'Uno','/images/subcategories/entertainment-favorite-game/card-12.jpg',12),
+    (v_id,'Скрабл','/images/subcategories/entertainment-favorite-game/card-13.jpg',13),
+    (v_id,'Resident Evil','/images/subcategories/entertainment-favorite-game/card-14.jpg',14),
+    (v_id,'Red Dead Redemption','/images/subcategories/entertainment-favorite-game/card-15.jpg',15)
+    ON CONFLICT DO NOTHING;
+    RAISE NOTICE '✅ Любимая игра: 15';
+  END IF;
+
+  -- 2.7 Самый вдохновляющий фильм
+  SELECT id INTO v_id FROM subcategories WHERE name='Самый вдохновляющий фильм' LIMIT 1;
+  IF v_id IS NOT NULL THEN
+    INSERT INTO questions(subcategory_id,text,image_url,order_index) VALUES
+    (v_id,'В погоне за счастьем','/images/subcategories/entertainment-inspiring-movie/card-1.jpg',1),
+    (v_id,'Общество мертвых поэтов','/images/subcategories/entertainment-inspiring-movie/card-2.jpg',2),
+    (v_id,'Король говорит','/images/subcategories/entertainment-inspiring-movie/card-3.jpg',3),
+    (v_id,'Всегда говори «Да»','/images/subcategories/entertainment-inspiring-movie/card-4.jpg',4),
+    (v_id,'127 часов','/images/subcategories/entertainment-inspiring-movie/card-5.jpg',5),
+    (v_id,'Невозможное','/images/subcategories/entertainment-inspiring-movie/card-6.jpg',6),
+    (v_id,'Август Раш','/images/subcategories/entertainment-inspiring-movie/card-7.jpg',7),
+    (v_id,'Жизнь прекрасна','/images/subcategories/entertainment-inspiring-movie/card-8.jpg',8),
+    (v_id,'Рокки','/images/subcategories/entertainment-inspiring-movie/card-9.jpg',9),
+    (v_id,'Социальная сеть','/images/subcategories/entertainment-inspiring-movie/card-10.jpg',10),
+    (v_id,'Билли Эллиот','/images/subcategories/entertainment-inspiring-movie/card-11.jpg',11),
+    (v_id,'Малышка на миллион','/images/subcategories/entertainment-inspiring-movie/card-12.jpg',12),
+    (v_id,'Достучаться до небес','/images/subcategories/entertainment-inspiring-movie/card-13.jpg',13),
+    (v_id,'Одаренная','/images/subcategories/entertainment-inspiring-movie/card-14.jpg',14),
+    (v_id,'Игры разума','/images/subcategories/entertainment-inspiring-movie/card-15.jpg',15)
+    ON CONFLICT DO NOTHING;
+    RAISE NOTICE '✅ Вдохновляющий фильм: 15';
+  END IF;
+
+  RAISE NOTICE '🎬 Развлечения и культура: 105 вопросов добавлено';
+END $$;
+
+-- Part 3: Животные (60 вопросов)
+DO $$ 
+DECLARE v_id UUID;
+BEGIN
+  -- 3.1 Любимая порода собак
+  SELECT id INTO v_id FROM subcategories WHERE name='Любимая порода собак' LIMIT 1;
+  IF v_id IS NOT NULL THEN
+    INSERT INTO questions(subcategory_id,text,image_url,order_index) VALUES
+    (v_id,'Лабрадор','/images/subcategories/animals-dog-breed/card-1.jpg',1),
+    (v_id,'Хаски','/images/subcategories/animals-dog-breed/card-2.jpg',2),
+    (v_id,'Немецкая овчарка','/images/subcategories/animals-dog-breed/card-3.jpg',3),
+    (v_id,'Золотистый ретривер','/images/subcategories/animals-dog-breed/card-4.jpg',4),
+    (v_id,'Французский бульдог','/images/subcategories/animals-dog-breed/card-5.jpg',5),
+    (v_id,'Корги','/images/subcategories/animals-dog-breed/card-6.jpg',6),
+    (v_id,'Шпиц','/images/subcategories/animals-dog-breed/card-7.jpg',7),
+    (v_id,'Бигль','/images/subcategories/animals-dog-breed/card-8.jpg',8),
+    (v_id,'Джек-рассел терьер','/images/subcategories/animals-dog-breed/card-9.jpg',9),
+    (v_id,'Йоркширский терьер','/images/subcategories/animals-dog-breed/card-10.jpg',10),
+    (v_id,'Доберман','/images/subcategories/animals-dog-breed/card-11.jpg',11),
+    (v_id,'Чихуахуа','/images/subcategories/animals-dog-breed/card-12.jpg',12),
+    (v_id,'Самоед','/images/subcategories/animals-dog-breed/card-13.jpg',13),
+    (v_id,'Бордер-колли','/images/subcategories/animals-dog-breed/card-14.jpg',14),
+    (v_id,'Мопс','/images/subcategories/animals-dog-breed/card-15.jpg',15)
+    ON CONFLICT DO NOTHING;
+    RAISE NOTICE '✅ Любимая порода собак: 15';
+  END IF;
+
+  -- 3.2 Кошки vs собаки
+  SELECT id INTO v_id FROM subcategories WHERE name='Кошки vs собаки' LIMIT 1;
+  IF v_id IS NOT NULL THEN
+    INSERT INTO questions(subcategory_id,text,image_url,order_index) VALUES
+    (v_id,'Игривый котенок','/images/subcategories/animals-cats-vs-dogs/card-1.jpg',1),
+    (v_id,'Преданный пес','/images/subcategories/animals-cats-vs-dogs/card-2.jpg',2),
+    (v_id,'Независимая кошка','/images/subcategories/animals-cats-vs-dogs/card-3.jpg',3),
+    (v_id,'Энергичный щенок','/images/subcategories/animals-cats-vs-dogs/card-4.jpg',4),
+    (v_id,'Ленивый кот','/images/subcategories/animals-cats-vs-dogs/card-5.jpg',5),
+    (v_id,'Охранный пес','/images/subcategories/animals-cats-vs-dogs/card-6.jpg',6),
+    (v_id,'Грациозная кошка','/images/subcategories/animals-cats-vs-dogs/card-7.jpg',7),
+    (v_id,'Дружелюбный пес','/images/subcategories/animals-cats-vs-dogs/card-8.jpg',8),
+    (v_id,'Любопытный кот','/images/subcategories/animals-cats-vs-dogs/card-9.jpg',9),
+    (v_id,'Обучаемая собака','/images/subcategories/animals-cats-vs-dogs/card-10.jpg',10),
+    (v_id,'Чистоплотная кошка','/images/subcategories/animals-cats-vs-dogs/card-11.jpg',11),
+    (v_id,'Активная собака','/images/subcategories/animals-cats-vs-dogs/card-12.jpg',12),
+    (v_id,'Ночной кот','/images/subcategories/animals-cats-vs-dogs/card-13.jpg',13),
+    (v_id,'Дневная собака','/images/subcategories/animals-cats-vs-dogs/card-14.jpg',14),
+    (v_id,'Оба хороши!','/images/subcategories/animals-cats-vs-dogs/card-15.jpg',15)
+    ON CONFLICT DO NOTHING;
+    RAISE NOTICE '✅ Кошки vs собаки: 15';
+  END IF;
+
+  -- 3.3 Идеальный питомец
+  SELECT id INTO v_id FROM subcategories WHERE name='Идеальный питомец' LIMIT 1;
+  IF v_id IS NOT NULL THEN
+    INSERT INTO questions(subcategory_id,text,image_url,order_index) VALUES
+    (v_id,'Собака','/images/subcategories/animals-ideal-pet/card-1.jpg',1),
+    (v_id,'Кошка','/images/subcategories/animals-ideal-pet/card-2.jpg',2),
+    (v_id,'Попугай','/images/subcategories/animals-ideal-pet/card-3.jpg',3),
+    (v_id,'Хомяк','/images/subcategories/animals-ideal-pet/card-4.jpg',4),
+    (v_id,'Кролик','/images/subcategories/animals-ideal-pet/card-5.jpg',5),
+    (v_id,'Аквариумные рыбки','/images/subcategories/animals-ideal-pet/card-6.jpg',6),
+    (v_id,'Морская свинка','/images/subcategories/animals-ideal-pet/card-7.jpg',7),
+    (v_id,'Черепаха','/images/subcategories/animals-ideal-pet/card-8.jpg',8),
+    (v_id,'Крыса','/images/subcategories/animals-ideal-pet/card-9.jpg',9),
+    (v_id,'Шиншилла','/images/subcategories/animals-ideal-pet/card-10.jpg',10),
+    (v_id,'Ёж','/images/subcategories/animals-ideal-pet/card-11.jpg',11),
+    (v_id,'Змея','/images/subcategories/animals-ideal-pet/card-12.jpg',12),
+    (v_id,'Игуана','/images/subcategories/animals-ideal-pet/card-13.jpg',13),
+    (v_id,'Хорек','/images/subcategories/animals-ideal-pet/card-14.jpg',14),
+    (v_id,'Сахарный поссум','/images/subcategories/animals-ideal-pet/card-15.jpg',15)
+    ON CONFLICT DO NOTHING;
+    RAISE NOTICE '✅ Идеальный питомец: 15';
+  END IF;
+
+  -- 3.4 Дикая природа или домашние любимцы
+  SELECT id INTO v_id FROM subcategories WHERE name='Дикая природа или домашние любимцы' LIMIT 1;
+  IF v_id IS NOT NULL THEN
+    INSERT INTO questions(subcategory_id,text,image_url,order_index) VALUES
+    (v_id,'Африканский лев','/images/subcategories/animals-wildlife/card-1.jpg',1),
+    (v_id,'Домашняя кошка','/images/subcategories/animals-wildlife/card-2.jpg',2),
+    (v_id,'Волк','/images/subcategories/animals-wildlife/card-3.jpg',3),
+    (v_id,'Домашняя собака','/images/subcategories/animals-wildlife/card-4.jpg',4),
+    (v_id,'Слон','/images/subcategories/animals-wildlife/card-5.jpg',5),
+    (v_id,'Морские свинки','/images/subcategories/animals-wildlife/card-6.jpg',6),
+    (v_id,'Тигр','/images/subcategories/animals-wildlife/card-7.jpg',7),
+    (v_id,'Канарейка','/images/subcategories/animals-wildlife/card-8.jpg',8),
+    (v_id,'Дельфин','/images/subcategories/animals-wildlife/card-9.jpg',9),
+    (v_id,'Аквариумные рыбки','/images/subcategories/animals-wildlife/card-10.jpg',10),
+    (v_id,'Панда','/images/subcategories/animals-wildlife/card-11.jpg',11),
+    (v_id,'Хомяк','/images/subcategories/animals-wildlife/card-12.jpg',12),
+    (v_id,'Жираф','/images/subcategories/animals-wildlife/card-13.jpg',13),
+    (v_id,'Кролик','/images/subcategories/animals-wildlife/card-14.jpg',14),
+    (v_id,'Оба мира интересны','/images/subcategories/animals-wildlife/card-15.jpg',15)
+    ON CONFLICT DO NOTHING;
+    RAISE NOTICE '✅ Дикая природа: 15';
+  END IF;
+
+  RAISE NOTICE '🐶 Животные: 60 вопросов добавлено';
+END $$;
