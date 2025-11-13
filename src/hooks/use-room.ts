@@ -57,21 +57,35 @@ export function useRoom() {
   const getInvitationLink = useCallback(() => {
     if (!invitationCode) return null
 
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3002'
-    return `${appUrl}/join/${invitationCode}`
+    // Always use Telegram bot link for maximum compatibility
+    const botUsername =
+      process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME || 'VibesMatch_bot'
+    return `https://t.me/${botUsername}?start=invite_${invitationCode}`
   }, [invitationCode])
 
   const getTelegramShareLink = useCallback(() => {
     if (!invitationCode) return null
 
-    // Use bot deep link instead of direct web link
+    // Create bot deep link
     const botUsername =
-      process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME || 'matchvibe_bot'
+      process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME || 'VibesMatch_bot'
     const botLink = `https://t.me/${botUsername}?start=invite_${invitationCode}`
-    const text = encodeURIComponent(
-      '🎮 Присоединяйся к игре в MatchVibe!\n👥 Давай узнаем, насколько совпадают наши вкусы!'
+
+    const shareText = encodeURIComponent(
+      '🎮 Присоединяйся к игре в MatchVibe!\n\n' +
+        '✨ Давай узнаем, насколько совпадают наши вкусы!\n\n' +
+        '👇 Нажми на ссылку, чтобы присоединиться:'
     )
-    return `https://t.me/share/url?url=${encodeURIComponent(botLink)}&text=${text}`
+
+    return `https://t.me/share/url?url=${encodeURIComponent(botLink)}&text=${shareText}`
+  }, [invitationCode])
+
+  const getWebFallbackLink = useCallback(() => {
+    if (!invitationCode) return null
+
+    // Web fallback for cases where Telegram is not available
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3002'
+    return `${appUrl}/join/${invitationCode}`
   }, [invitationCode])
 
   return {
@@ -87,6 +101,7 @@ export function useRoom() {
     clearRoom,
     getInvitationLink,
     getTelegramShareLink,
+    getWebFallbackLink,
     isWaiting: currentRoom?.status === 'waiting',
     isReady: currentRoom?.status === 'ready',
     isPlaying: currentRoom?.status === 'playing',

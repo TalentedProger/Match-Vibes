@@ -24,13 +24,17 @@ export default function JoinPage() {
       // Prevent double join attempts
       if (isJoining) return
 
-      if (!isAuthenticated) {
-        setError('Требуется аутентификация')
+      if (!code) {
+        setError('Неверный код приглашения')
         return
       }
 
-      if (!code) {
-        setError('Неверный код приглашения')
+      // For unauthenticated users, show helpful message
+      if (!isAuthenticated) {
+        setError(
+          'Для присоединения к игре требуется аутентификация.\n\n' +
+            '👉 Вернитесь в чат с ботом и нажмите кнопку "Присоединиться к игре"'
+        )
         return
       }
 
@@ -40,10 +44,28 @@ export default function JoinPage() {
         // Navigate to waiting room
         router.push(`/game/${room.id}/waiting`)
       } catch (err) {
-        const message =
-          err instanceof Error
-            ? err.message
-            : 'Не удалось присоединиться к комнате'
+        let message = 'Не удалось присоединиться к комнате'
+
+        if (err instanceof Error) {
+          // Handle specific error cases
+          if (err.message.includes('User not found')) {
+            message =
+              'Пользователь не найден в системе.\n\n' +
+              '👉 Вернитесь в чат с ботом и попробуйте снова'
+          } else if (err.message.includes('Invalid invitation code')) {
+            message =
+              'Код приглашения недействителен.\n\n' +
+              '• Комната не найдена или игра уже началась\n' +
+              '• Попросите новое приглашение'
+          } else if (err.message.includes('already full')) {
+            message = 'Комната уже заполнена'
+          } else if (err.message.includes('your own room')) {
+            message = 'Нельзя присоединиться к своей комнате'
+          } else {
+            message = err.message
+          }
+        }
+
         setError(message)
         setIsJoining(false)
       }
@@ -78,12 +100,27 @@ export default function JoinPage() {
             <p className="text-muted-foreground">{error}</p>
           </div>
 
-          <button
-            onClick={() => router.push('/')}
-            className="w-full px-6 py-3 bg-primary text-white rounded-xl font-semibold hover:opacity-90 transition-opacity"
-          >
-            Вернуться на главную
-          </button>
+          <div className="space-y-3">
+            <button
+              onClick={() => {
+                const botUsername =
+                  process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME ||
+                  'VibesMatch_bot'
+                const botUrl = `https://t.me/${botUsername}`
+                window.open(botUrl, '_blank')
+              }}
+              className="w-full px-6 py-3 bg-primary text-white rounded-xl font-semibold hover:opacity-90 transition-opacity"
+            >
+              🤖 Вернуться в бот
+            </button>
+
+            <button
+              onClick={() => router.push('/')}
+              className="w-full px-6 py-3 bg-muted text-muted-foreground rounded-xl font-medium hover:bg-muted/80 transition-colors"
+            >
+              На главную страницу
+            </button>
+          </div>
         </div>
       </div>
     )

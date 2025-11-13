@@ -22,8 +22,6 @@ export default function WaitingRoomPage() {
     isPlaying,
     refreshRoom,
     leaveRoom,
-    getInvitationLink,
-    getTelegramShareLink,
   } = useRoom()
 
   // Refresh room on mount
@@ -55,9 +53,6 @@ export default function WaitingRoomPage() {
       </AuthGuard>
     )
   }
-
-  const invitationLink = getInvitationLink()
-  const telegramShareLink = getTelegramShareLink()
 
   return (
     <AuthGuard>
@@ -107,13 +102,9 @@ export default function WaitingRoomPage() {
           </div>
 
           {/* Invitation Section (only for host) */}
-          {isHost && invitationLink && telegramShareLink && (
+          {isHost && currentRoom?.invitation_code && (
             <div className="w-full max-w-md">
-              <InvitationLink
-                invitationCode={currentRoom.invitation_code}
-                invitationLink={invitationLink}
-                telegramShareLink={telegramShareLink}
-              />
+              <InvitationLink invitationCode={currentRoom.invitation_code} />
             </div>
           )}
 
@@ -148,9 +139,7 @@ export default function WaitingRoomPage() {
                   {currentRoom.guest_id ? (
                     <p className="text-sm text-green-500">✓ Готов</p>
                   ) : (
-                    <p className="text-sm text-muted-foreground">
-                      Ожидание...
-                    </p>
+                    <p className="text-sm text-muted-foreground">Ожидание...</p>
                   )}
                 </div>
               </div>

@@ -20,6 +20,20 @@ export async function POST(
 
     const supabase = await createClient()
 
+    // Verify user exists (important for new users from bot)
+    const { data: userProfile, error: userError } = await (supabase as any)
+      .from('profiles')
+      .select('id')
+      .eq('id', userId)
+      .single()
+
+    if (userError || !userProfile) {
+      return NextResponse.json(
+        { message: 'User not found. Please restart from the bot.' },
+        { status: 404 }
+      )
+    }
+
     // Find room by invitation code
     const { data: room, error: findError } = await (supabase as any)
       .from('rooms')
