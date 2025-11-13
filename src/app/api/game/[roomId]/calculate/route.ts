@@ -53,8 +53,12 @@ export async function POST(
       })
     }
 
-    // Only allow calculation when room is playing or completed
-    if (room.status !== 'playing' && room.status !== 'completed') {
+    // Only allow calculation when room is ready, playing or completed
+    if (
+      room.status !== 'ready' &&
+      room.status !== 'playing' &&
+      room.status !== 'completed'
+    ) {
       return NextResponse.json(
         { error: `Room is not ready for calculation (status: ${room.status})` },
         { status: 400 }

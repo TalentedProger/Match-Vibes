@@ -35,6 +35,7 @@ interface GameState {
   resumeTimer: () => void
   completeGame: () => void
   resetGame: () => void
+  clearGame: () => void
   setError: (error: string | null) => void
   setLoading: (loading: boolean) => void
 }
@@ -58,6 +59,18 @@ export const useGameStore = create<GameState>()(
       ...initialState,
 
       initGame: (roomId, categoryId, questions) => {
+        console.log('initGame called with:', {
+          roomId,
+          categoryId,
+          questionsCount: questions.length,
+        })
+
+        // Clear any existing game state first
+        const currentState = get()
+        if (currentState.roomId && currentState.roomId !== roomId) {
+          console.log('Switching rooms, clearing previous game state')
+        }
+
         set({
           roomId,
           categoryId,
@@ -136,6 +149,14 @@ export const useGameStore = create<GameState>()(
         set(initialState)
       },
 
+      clearGame: () => {
+        console.log('Clearing game state')
+        set({
+          ...initialState,
+          // Keep only basic state, clear everything else
+        })
+      },
+
       setError: error => {
         set({ error })
       },
@@ -150,6 +171,7 @@ export const useGameStore = create<GameState>()(
       partialize: state => ({
         roomId: state.roomId,
         categoryId: state.categoryId,
+        questions: state.questions,
         currentQuestionIndex: state.currentQuestionIndex,
         responses: state.responses,
       }),

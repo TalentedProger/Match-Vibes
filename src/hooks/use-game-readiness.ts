@@ -57,7 +57,7 @@ export function useGameReadiness(
       hostId: '',
       guestId: '',
     },
-    isLoading: false,
+    isLoading: true, // Start with loading true to prevent premature calculation
     error: null,
     lastChecked: null,
   })
@@ -77,14 +77,14 @@ export function useGameReadiness(
       const data: GameReadiness = await response.json()
 
       setState(prev => ({
-        ...prev,
         ...data,
         isLoading: false,
         lastChecked: new Date(),
       }))
 
-      // Call onReady callback if both players are ready
+      // Call onReady callback if both players are ready (and we weren't ready before)
       if (data.ready && !state.ready && onReady) {
+        console.log('useGameReadiness: calling onReady callback')
         onReady()
       }
     } catch (err) {
@@ -92,7 +92,6 @@ export function useGameReadiness(
       setState(prev => ({
         ...prev,
         isLoading: false,
-        error: errorMessage,
         lastChecked: new Date(),
       }))
     }

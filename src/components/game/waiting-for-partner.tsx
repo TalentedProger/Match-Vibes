@@ -21,6 +21,13 @@ export function WaitingForPartnerScreen({
       ? Math.round((partnerProgress / totalQuestions) * 100)
       : 0
 
+  console.log('WaitingForPartnerScreen rendered:', {
+    partnerProgress,
+    totalQuestions,
+    partnerPercentage,
+    isPartnerActive,
+  })
+
   return (
     <div
       className={`min-h-screen flex flex-col items-center justify-center p-6 bg-gradient-to-br from-background to-background/50 ${className}`}

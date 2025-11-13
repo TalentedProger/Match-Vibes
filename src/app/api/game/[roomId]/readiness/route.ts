@@ -94,6 +94,17 @@ export async function GET(
     const guestCompleted = guestResponseCount >= expectedCount
     const bothCompleted = hostCompleted && guestCompleted
 
+    console.log('Readiness check:', {
+      roomId,
+      expectedCount,
+      hostResponseCount,
+      guestResponseCount,
+      hostCompleted,
+      guestCompleted,
+      bothCompleted,
+      roomStatus: room.status,
+    })
+
     // 5. Check if result already exists
     const { data: existingResult } = await supabase
       .from('results')

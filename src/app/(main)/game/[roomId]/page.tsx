@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { AuthGuard } from '@/components/auth/auth-guard'
 import { useRoom } from '@/hooks/use-room'
@@ -8,6 +8,7 @@ import { useAuth } from '@/hooks/use-auth'
 import { useGameStore } from '@/stores/game-store'
 import { useTimer } from '@/hooks/use-timer'
 import { useGameRealtime } from '@/hooks/use-game-realtime'
+import { useGameManager } from '@/hooks/use-game-manager'
 import { GameCard } from '@/components/game/game-card'
 import { PartnerProgress } from '@/components/game/partner-progress'
 import { Loader2, MessageCircleQuestion, Clock } from 'lucide-react'
@@ -20,6 +21,9 @@ export default function GamePage() {
   const roomId = params.roomId as string
   const { user } = useAuth()
   const { currentRoom } = useRoom()
+
+  // Game state manager (handles cleanup and prevents duplicates)
+  useGameManager()
 
   const {
     questions,
@@ -49,7 +53,20 @@ export default function GamePage() {
         return
       }
 
+      // Prevent re-fetching if we already have questions for this room and category
+      if (questions.length > 0 && roomId === currentRoom.id) {
+        console.log('Questions already loaded for this room, skipping fetch')
+        return
+      }
+
       setLoading(true)
+      console.log(
+        'Fetching questions for room:',
+        roomId,
+        'category:',
+        currentRoom.category_id
+      )
+
       try {
         // Build URL with optional subcategory filter
         let url = `/api/categories/${currentRoom.category_id}/questions`
@@ -71,11 +88,15 @@ export default function GamePage() {
           return
         }
 
+        console.log('Raw questions from API:', data.questions.length)
+
         // Remove any potential duplicates from questions
         const uniqueQuestions = data.questions.filter(
           (q: Question, index: number, self: Question[]) =>
             index === self.findIndex(t => t.id === q.id)
         )
+
+        console.log('Unique questions after filtering:', uniqueQuestions.length)
 
         initGame(roomId, currentRoom.category_id, uniqueQuestions)
       } catch (err) {
@@ -87,7 +108,16 @@ export default function GamePage() {
     }
 
     fetchQuestions()
-  }, [currentRoom, roomId, initGame, setLoading, setError])
+  }, [
+    currentRoom?.category_id,
+    currentRoom?.subcategory_id,
+    currentRoom?.id,
+    roomId,
+    questions.length,
+    initGame,
+    setLoading,
+    setError,
+  ])
 
   // Timer hook
   const { timeRemaining, resetTimer } = useTimer({

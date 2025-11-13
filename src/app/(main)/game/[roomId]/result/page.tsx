@@ -25,7 +25,7 @@ export default function ResultPage() {
   const [isCalculating, setIsCalculating] = useState(false)
   const [calculationAttempted, setCalculationAttempted] = useState(false)
   const [totalQuestions, setTotalQuestions] = useState(0)
-  const [waitingForPartner, setWaitingForPartner] = useState(false)
+  const [waitingForPartner, setWaitingForPartner] = useState(true) // START with waiting - safer
   const [retryCount, setRetryCount] = useState(0)
   const MAX_RETRIES = 10 // Maximum retry attempts
   const RETRY_INTERVAL = 5000 // 5 seconds between retries
@@ -36,18 +36,17 @@ export default function ResultPage() {
     user?.id || ''
   )
 
-  // Game readiness tracking
   const {
     ready: bothPlayersReady,
     progress,
+    isLoading: readinessLoading,
     refetch: refetchReadiness,
   } = useGameReadiness(roomId, {
-    enabled: waitingForPartner && !result,
-    pollInterval: 2000, // Check every 2 seconds when waiting
+    enabled: !result, // Always check if no result yet
+    pollInterval: 2000, // Check every 2 seconds
     onReady: () => {
-      console.log('Both players ready, attempting calculation...')
-      setWaitingForPartner(false)
-      setCalculationAttempted(false)
+      console.log('useGameReadiness onReady callback - both players ready!')
+      // Logic is handled in main useEffect, don't duplicate here
     },
   })
 
@@ -113,79 +112,81 @@ export default function ResultPage() {
     }
   }, [roomId])
 
-  // Auto-calculate when both players are ready
+  // MAIN LOGIC: Check readiness first, then decide what to show
   useEffect(() => {
-    async function autoCalculate() {
-      if (
-        !isLoading &&
-        !result &&
-        !isCalculating &&
-        !calculationAttempted &&
-        (bothPlayersReady || retryCount < MAX_RETRIES)
-      ) {
+    async function handleResultFlow() {
+      // Skip if still loading basic data or already have result
+      if (isLoading || result) return
+
+      console.log('Result flow check:', {
+        readinessLoading,
+        bothPlayersReady,
+        calculationAttempted,
+        isCalculating,
+        waitingForPartner,
+      })
+
+      // If readiness is still loading, keep waiting
+      if (readinessLoading) {
+        console.log('Readiness still loading, staying in waiting state')
+        setWaitingForPartner(true)
+        return
+      }
+
+      // If NOT both ready, ALWAYS show waiting screen
+      if (!bothPlayersReady) {
+        console.log('Not both ready, showing waiting screen')
+        setWaitingForPartner(true)
+        setCalculationAttempted(false)
+        setIsCalculating(false)
+        return
+      }
+
+      // ONLY if both ready AND not attempted yet - try calculation
+      if (bothPlayersReady && !calculationAttempted && !isCalculating) {
+        console.log('Both ready, attempting calculation')
+        setWaitingForPartner(false)
         setCalculationAttempted(true)
-
-        // Shorter delay if we know both players are ready
-        const delay = bothPlayersReady ? 1000 : 2000
-        await new Promise(resolve => setTimeout(resolve, delay))
-
         setIsCalculating(true)
+
+        // Small delay for UI transition
+        await new Promise(resolve => setTimeout(resolve, 500))
 
         try {
           await calculateMatch()
-          setWaitingForPartner(false)
-          setRetryCount(0) // Reset retry count on success
-          console.log('Match calculation successful!')
+          console.log('Calculation successful!')
+          setRetryCount(0)
         } catch (err: any) {
           console.error('Calculation failed:', err)
-          setIsCalculating(false)
 
-          // Check if error is due to partner not finishing
-          if (
-            err.message?.includes('Both players must complete all questions') ||
-            err.message?.includes('Room is not ready for calculation')
-          ) {
-            // Only set waiting if we haven't confirmed readiness
-            if (!bothPlayersReady) {
-              setWaitingForPartner(true)
-              setRetryCount(prev => prev + 1)
+          // If calculation fails, go back to waiting
+          // This covers race conditions and temporary issues
+          setWaitingForPartner(true)
+          setCalculationAttempted(false)
+          setRetryCount(prev => prev + 1)
 
-              // Schedule next retry with exponential backoff
-              const nextRetryDelay = Math.min(
-                RETRY_INTERVAL * Math.pow(1.2, retryCount),
-                15000
-              )
-              setTimeout(() => {
-                setCalculationAttempted(false)
-              }, nextRetryDelay)
-            } else {
-              // Both ready but still failing - shorter retry
-              setTimeout(() => {
-                setCalculationAttempted(false)
-              }, 2000)
-            }
-          } else {
-            // For other errors, don't retry
-            setWaitingForPartner(false)
-          }
+          // Refresh readiness after delay
+          setTimeout(() => {
+            console.log('Retrying readiness check after calculation failure')
+            refetchReadiness()
+          }, 3000)
         } finally {
-          if (!waitingForPartner) {
-            setIsCalculating(false)
-          }
+          setIsCalculating(false)
         }
       }
     }
 
-    autoCalculate()
+    handleResultFlow()
   }, [
     isLoading,
     result,
-    calculateMatch,
-    isCalculating,
-    calculationAttempted,
-    waitingForPartner,
-    retryCount,
+    readinessLoading,
     bothPlayersReady,
+    calculationAttempted,
+    isCalculating,
+    waitingForPartner,
+    calculateMatch,
+    refetchReadiness,
   ])
 
   const handlePlayAgain = () => {
@@ -193,25 +194,18 @@ export default function ResultPage() {
   }
 
   const handleRetry = async () => {
-    setIsCalculating(true)
-    setWaitingForPartner(false)
+    console.log('Manual retry triggered')
+    setWaitingForPartner(true) // Always start with waiting
     setCalculationAttempted(false)
-    setRetryCount(0) // Reset retry count on manual retry
+    setRetryCount(0)
+    setIsCalculating(false)
 
-    try {
-      await calculateMatch()
-    } catch (err: any) {
-      console.error('Manual retry failed:', err)
-      if (err.message?.includes('Both players must complete all questions')) {
-        setWaitingForPartner(true)
-      }
-    } finally {
-      setIsCalculating(false)
-    }
+    // Force refresh readiness check
+    await refetchReadiness()
   }
 
-  // Loading state
-  if (isLoading || isCalculating) {
+  // Loading state - also include readiness loading
+  if (isLoading || isCalculating || readinessLoading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen p-4">
         <Loader2 className="w-12 h-12 animate-spin text-primary mb-4" />
@@ -223,7 +217,7 @@ export default function ResultPage() {
     )
   }
 
-  // Waiting for partner state - use enhanced component with readiness data
+  // Waiting for partner state - PRIORITY: Show this instead of errors
   if (waitingForPartner && !result) {
     // Use progress from readiness API if available, fallback to realtime
     const currentProgress =
@@ -235,6 +229,12 @@ export default function ResultPage() {
 
     const currentTotal = progress.total > 0 ? progress.total : totalQuestions
 
+    console.log('Showing waiting screen:', {
+      currentProgress,
+      currentTotal,
+      isPartnerActive,
+    })
+
     return (
       <WaitingForPartnerScreen
         partnerProgress={currentProgress}
@@ -244,8 +244,8 @@ export default function ResultPage() {
     )
   }
 
-  // Error state
-  if (error && !result && !waitingForPartner) {
+  // Error state - ONLY show if NOT waiting (waiting takes priority)
+  if (error && !result && !waitingForPartner && !readinessLoading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen p-4">
         <AlertCircle className="w-16 h-16 text-destructive mb-4" />
