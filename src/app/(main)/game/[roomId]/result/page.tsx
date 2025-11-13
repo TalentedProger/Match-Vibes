@@ -10,6 +10,8 @@ import { createClient } from '@/lib/supabase/client'
 import { useAuth } from '@/hooks/use-auth'
 import { useGameRealtime } from '@/hooks/use-game-realtime'
 import { motion } from 'framer-motion'
+import { WaitingForPartnerScreen } from '@/components/game/waiting-for-partner'
+import { useGameReadiness } from '@/hooks/use-game-readiness'
 
 export default function ResultPage() {
   const params = useParams()
@@ -24,9 +26,30 @@ export default function ResultPage() {
   const [calculationAttempted, setCalculationAttempted] = useState(false)
   const [totalQuestions, setTotalQuestions] = useState(0)
   const [waitingForPartner, setWaitingForPartner] = useState(false)
+  const [retryCount, setRetryCount] = useState(0)
+  const MAX_RETRIES = 10 // Maximum retry attempts
+  const RETRY_INTERVAL = 5000 // 5 seconds between retries
 
   // Real-time partner tracking
-  const { partnerProgress } = useGameRealtime(roomId, user?.id || '')
+  const { partnerProgress, isPartnerActive } = useGameRealtime(
+    roomId,
+    user?.id || ''
+  )
+
+  // Game readiness tracking
+  const {
+    ready: bothPlayersReady,
+    progress,
+    refetch: refetchReadiness,
+  } = useGameReadiness(roomId, {
+    enabled: waitingForPartner && !result,
+    pollInterval: 2000, // Check every 2 seconds when waiting
+    onReady: () => {
+      console.log('Both players ready, attempting calculation...')
+      setWaitingForPartner(false)
+      setCalculationAttempted(false)
+    },
+  })
 
   // Fetch category name
   useEffect(() => {
@@ -90,29 +113,60 @@ export default function ResultPage() {
     }
   }, [roomId])
 
-  // Auto-calculate if no result exists (with delay to ensure both players finished)
+  // Auto-calculate when both players are ready
   useEffect(() => {
     async function autoCalculate() {
-      if (!isLoading && !result && !isCalculating && !calculationAttempted) {
+      if (
+        !isLoading &&
+        !result &&
+        !isCalculating &&
+        !calculationAttempted &&
+        (bothPlayersReady || retryCount < MAX_RETRIES)
+      ) {
         setCalculationAttempted(true)
-        // Add small delay to ensure both players have finished submitting
-        await new Promise(resolve => setTimeout(resolve, 1500))
+
+        // Shorter delay if we know both players are ready
+        const delay = bothPlayersReady ? 1000 : 2000
+        await new Promise(resolve => setTimeout(resolve, delay))
+
         setIsCalculating(true)
+
         try {
           await calculateMatch()
           setWaitingForPartner(false)
+          setRetryCount(0) // Reset retry count on success
+          console.log('Match calculation successful!')
         } catch (err: any) {
           console.error('Calculation failed:', err)
+          setIsCalculating(false)
+
           // Check if error is due to partner not finishing
           if (
-            err.message?.includes('Both players must complete all questions')
+            err.message?.includes('Both players must complete all questions') ||
+            err.message?.includes('Room is not ready for calculation')
           ) {
-            setWaitingForPartner(true)
-            setIsCalculating(false)
-            // Retry after a delay
-            setTimeout(() => {
-              setCalculationAttempted(false)
-            }, 3000)
+            // Only set waiting if we haven't confirmed readiness
+            if (!bothPlayersReady) {
+              setWaitingForPartner(true)
+              setRetryCount(prev => prev + 1)
+
+              // Schedule next retry with exponential backoff
+              const nextRetryDelay = Math.min(
+                RETRY_INTERVAL * Math.pow(1.2, retryCount),
+                15000
+              )
+              setTimeout(() => {
+                setCalculationAttempted(false)
+              }, nextRetryDelay)
+            } else {
+              // Both ready but still failing - shorter retry
+              setTimeout(() => {
+                setCalculationAttempted(false)
+              }, 2000)
+            }
+          } else {
+            // For other errors, don't retry
+            setWaitingForPartner(false)
           }
         } finally {
           if (!waitingForPartner) {
@@ -130,6 +184,8 @@ export default function ResultPage() {
     isCalculating,
     calculationAttempted,
     waitingForPartner,
+    retryCount,
+    bothPlayersReady,
   ])
 
   const handlePlayAgain = () => {
@@ -138,8 +194,20 @@ export default function ResultPage() {
 
   const handleRetry = async () => {
     setIsCalculating(true)
-    await calculateMatch()
-    setIsCalculating(false)
+    setWaitingForPartner(false)
+    setCalculationAttempted(false)
+    setRetryCount(0) // Reset retry count on manual retry
+
+    try {
+      await calculateMatch()
+    } catch (err: any) {
+      console.error('Manual retry failed:', err)
+      if (err.message?.includes('Both players must complete all questions')) {
+        setWaitingForPartner(true)
+      }
+    } finally {
+      setIsCalculating(false)
+    }
   }
 
   // Loading state
@@ -155,61 +223,24 @@ export default function ResultPage() {
     )
   }
 
-  // Waiting for partner state
+  // Waiting for partner state - use enhanced component with readiness data
   if (waitingForPartner && !result) {
-    const partnerPercentage =
-      totalQuestions > 0
-        ? Math.round((partnerProgress / totalQuestions) * 100)
-        : 0
+    // Use progress from readiness API if available, fallback to realtime
+    const currentProgress =
+      progress.total > 0
+        ? user?.id === progress.room.hostId
+          ? progress.guest.count
+          : progress.host.count
+        : partnerProgress
+
+    const currentTotal = progress.total > 0 ? progress.total : totalQuestions
 
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen p-4">
-        <motion.div
-          initial={{ scale: 0.8, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ duration: 0.5 }}
-          className="text-center"
-        >
-          <div className="inline-flex items-center justify-center w-20 h-20 bg-primary/10 rounded-full mb-6">
-            <Users className="w-10 h-10 text-primary" />
-          </div>
-          <h2 className="text-2xl font-bold mb-2">Ждем партнера...</h2>
-          <p className="text-muted-foreground mb-8">
-            Ваш партнер еще отвечает на вопросы
-          </p>
-
-          {/* Progress Bar */}
-          <div className="max-w-sm mx-auto">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-medium text-foreground">
-                Прогресс партнера
-              </span>
-              <span className="text-sm text-muted-foreground">
-                {partnerProgress}/{totalQuestions}
-              </span>
-            </div>
-            <div className="h-3 bg-muted rounded-full overflow-hidden">
-              <motion.div
-                className="h-full bg-gradient-to-r from-secondary to-primary rounded-full"
-                initial={{ width: 0 }}
-                animate={{ width: `${partnerPercentage}%` }}
-                transition={{ duration: 0.5, ease: 'easeOut' }}
-              />
-            </div>
-            <p className="text-sm text-primary font-semibold mt-2">
-              {partnerPercentage}%
-            </p>
-          </div>
-
-          <motion.div
-            animate={{ opacity: [0.5, 1, 0.5] }}
-            transition={{ duration: 2, repeat: Infinity }}
-            className="mt-8"
-          >
-            <Loader2 className="w-8 h-8 animate-spin text-primary mx-auto" />
-          </motion.div>
-        </motion.div>
-      </div>
+      <WaitingForPartnerScreen
+        partnerProgress={currentProgress}
+        totalQuestions={currentTotal}
+        isPartnerActive={isPartnerActive}
+      />
     )
   }
 
