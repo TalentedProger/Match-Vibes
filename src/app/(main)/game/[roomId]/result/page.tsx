@@ -218,7 +218,7 @@ export default function ResultPage() {
 
     initCheck()
 
-    // Start polling for readiness
+    // Start polling for readiness - check every 1.5s for faster response
     pollIntervalRef.current = setInterval(async () => {
       if (!isMountedRef.current) return
       if (calculationAttemptedRef.current) return
@@ -226,7 +226,7 @@ export default function ResultPage() {
       const data = await checkReadiness()
       if (!data || !isMountedRef.current) return
 
-      // If result exists, fetch it
+      // If result exists, fetch it immediately
       if (data.resultExists) {
         stopPolling()
         await fetchResult()
@@ -234,12 +234,12 @@ export default function ResultPage() {
         return
       }
 
-      // If both ready, calculate
+      // If both ready, calculate immediately
       if (data.ready && !calculationAttemptedRef.current) {
         stopPolling()
         await performCalculation()
       }
-    }, 3000)
+    }, 1500)
 
     return () => {
       stopPolling()

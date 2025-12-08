@@ -251,11 +251,14 @@ export default function GamePage() {
 
   return (
     <AuthGuard>
-      <div className="min-h-screen flex flex-col bg-background pb-[var(--tg-content-safe-area-bottom,0px)]">
+      <div
+        className="h-[100dvh] flex flex-col bg-background overflow-hidden"
+        style={{ paddingBottom: 'var(--tg-safe-bottom, 0px)' }}
+      >
         {/* Partner Progress (sticky at top) */}
         {currentRoom?.guest_id && (
-          <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-lg border-b border-border">
-            <div className="container max-w-2xl mx-auto px-4 py-2">
+          <div className="flex-shrink-0 bg-background/80 backdrop-blur-lg border-b border-border">
+            <div className="container max-w-2xl mx-auto px-3 py-1.5">
               <PartnerProgress
                 progress={partnerProgress}
                 total={questions.length}
@@ -265,10 +268,10 @@ export default function GamePage() {
           </div>
         )}
 
-        {/* Main Game Area */}
-        <div className="flex-1 flex flex-col items-center justify-center px-3 py-2">
+        {/* Main Game Area - takes remaining space */}
+        <div className="flex-1 flex flex-col items-center justify-center px-3 py-1 min-h-0">
           {/* Question Counter and Timer Header */}
-          <div className="w-full max-w-sm mx-auto mb-3 flex items-center justify-between px-1">
+          <div className="w-full max-w-sm mx-auto mb-2 flex items-center justify-between px-1">
             <div className="flex items-center gap-1.5">
               <MessageCircleQuestion className="w-4 h-4 text-primary" />
               <span className="text-sm font-semibold text-foreground">
@@ -297,7 +300,7 @@ export default function GamePage() {
                   damping: 25,
                   duration: 0.2,
                 }}
-                className="w-full max-w-[320px] mx-auto"
+                className="w-full max-w-[340px] mx-auto"
               >
                 <GameCard
                   question={currentQuestion}

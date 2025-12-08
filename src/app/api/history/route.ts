@@ -91,8 +91,17 @@ export async function GET(request: NextRequest) {
       const matchPercentage = rawPercentage
         ? typeof rawPercentage === 'string'
           ? parseFloat(rawPercentage)
-          : rawPercentage
+          : Number(rawPercentage)
         : 0
+
+      // Debug logging
+      console.log('Room processing:', {
+        roomId: room.id,
+        hasResult: !!result,
+        rawPercentage,
+        parsedPercentage: matchPercentage,
+        resultObj: result,
+      })
 
       return {
         id: result?.id || room.id,

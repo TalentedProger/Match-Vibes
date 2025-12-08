@@ -43,14 +43,14 @@ export function WaitingForPartnerScreen({
         }}
         className="text-center max-w-md w-full"
       >
-        {/* Main Icon with Animation */}
+        {/* Main Icon with Animation - slower and more relaxed */}
         <motion.div
           animate={{
-            scale: [1, 1.05, 1],
-            rotate: [0, 2, -2, 0],
+            scale: [1, 1.03, 1],
+            rotate: [0, 1, -1, 0],
           }}
           transition={{
-            duration: 3,
+            duration: 6,
             repeat: Infinity,
             ease: 'easeInOut',
           }}
@@ -58,11 +58,11 @@ export function WaitingForPartnerScreen({
         >
           <Users className="w-12 h-12 text-primary" />
 
-          {/* Pulsing ring effect */}
+          {/* Pulsing ring effect - slower */}
           <motion.div
             className="absolute inset-0 border-2 border-primary/30 rounded-full"
-            animate={{ scale: [1, 1.2, 1], opacity: [0.8, 0.2, 0.8] }}
-            transition={{ duration: 2, repeat: Infinity }}
+            animate={{ scale: [1, 1.15, 1], opacity: [0.6, 0.15, 0.6] }}
+            transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
           />
         </motion.div>
 
@@ -102,11 +102,15 @@ export function WaitingForPartnerScreen({
               <span className="text-sm font-semibold text-foreground">
                 Прогресс партнера
               </span>
-              {/* Active indicator */}
+              {/* Active indicator - slower pulse */}
               {isPartnerActive && (
                 <motion.div
-                  animate={{ opacity: [0.5, 1, 0.5] }}
-                  transition={{ duration: 1.5, repeat: Infinity }}
+                  animate={{ opacity: [0.6, 1, 0.6] }}
+                  transition={{
+                    duration: 3,
+                    repeat: Infinity,
+                    ease: 'easeInOut',
+                  }}
                   className="w-2 h-2 bg-green-500 rounded-full"
                 />
               )}
@@ -132,15 +136,15 @@ export function WaitingForPartnerScreen({
                   damping: 20,
                 }}
               >
-                {/* Shimmer effect on progress */}
+                {/* Shimmer effect on progress - slower */}
                 {partnerPercentage > 0 && (
                   <motion.div
-                    className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent"
+                    className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent"
                     animate={{ x: ['-100%', '100%'] }}
                     transition={{
-                      duration: 1.5,
+                      duration: 3,
                       repeat: Infinity,
-                      ease: 'easeInOut',
+                      ease: 'linear',
                     }}
                   />
                 )}
@@ -180,7 +184,7 @@ export function WaitingForPartnerScreen({
           </div>
         </motion.div>
 
-        {/* Loading Animation */}
+        {/* Loading Animation - slower and calmer */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -189,20 +193,19 @@ export function WaitingForPartnerScreen({
         >
           <motion.div
             animate={{
-              opacity: [0.4, 1, 0.4],
-              scale: [0.8, 1, 0.8],
+              opacity: [0.5, 0.9, 0.5],
             }}
             transition={{
-              duration: 2,
+              duration: 4,
               repeat: Infinity,
               ease: 'easeInOut',
             }}
           >
-            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            <Loader2 className="w-6 h-6 animate-[spin_3s_linear_infinite] text-primary" />
           </motion.div>
           <motion.span
-            animate={{ opacity: [0.6, 1, 0.6] }}
-            transition={{ duration: 2, repeat: Infinity }}
+            animate={{ opacity: [0.7, 1, 0.7] }}
+            transition={{ duration: 4, repeat: Infinity, ease: 'easeInOut' }}
             className="text-sm font-medium text-muted-foreground"
           >
             Ожидание завершения...
