@@ -1,17 +1,38 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { GameResultDisplay } from '@/components/game/game-result'
 import { useMatchResult } from '@/hooks/use-match-result'
 import { Button } from '@/components/ui/button'
-import { Loader2, AlertCircle, Users } from 'lucide-react'
+import { Loader2, AlertCircle } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useAuth } from '@/hooks/use-auth'
 import { useGameRealtime } from '@/hooks/use-game-realtime'
-import { motion } from 'framer-motion'
 import { WaitingForPartnerScreen } from '@/components/game/waiting-for-partner'
-import { useGameReadiness } from '@/hooks/use-game-readiness'
+
+// States for the result page flow
+type PageState =
+  | 'loading' // Initial loading
+  | 'waiting' // Waiting for partner to finish
+  | 'calculating' // Both ready, calculating results
+  | 'result' // Showing results
+  | 'error' // Error state
+
+interface ReadinessData {
+  ready: boolean
+  resultExists: boolean
+  progress: {
+    host: { completed: boolean; count: number; percentage: number }
+    guest: { completed: boolean; count: number; percentage: number }
+    total: number
+  }
+  room: {
+    status: string
+    hostId: string
+    guestId: string
+  }
+}
 
 export default function ResultPage() {
   const params = useParams()
@@ -19,55 +40,56 @@ export default function ResultPage() {
   const roomId = params.roomId as string
   const { user } = useAuth()
 
-  const { result, isLoading, error, calculateMatch, fetchResult } =
-    useMatchResult(roomId)
-  const [categoryName, setCategoryName] = useState<string>('Категория')
-  const [isCalculating, setIsCalculating] = useState(false)
-  const [calculationAttempted, setCalculationAttempted] = useState(false)
-  const [totalQuestions, setTotalQuestions] = useState(0)
-  const [waitingForPartner, setWaitingForPartner] = useState(true) // START with waiting - safer
-  const [retryCount, setRetryCount] = useState(0)
-  const MAX_RETRIES = 10 // Maximum retry attempts
-  const RETRY_INTERVAL = 5000 // 5 seconds between retries
+  // Core result hook
+  const {
+    result,
+    isLoading: isResultLoading,
+    error: resultError,
+    calculateMatch,
+    fetchResult,
+  } = useMatchResult(roomId)
 
-  // Real-time partner tracking
+  // Page state management
+  const [pageState, setPageState] = useState<PageState>('loading')
+  const [categoryName, setCategoryName] = useState<string>('Категория')
+  const [totalQuestions, setTotalQuestions] = useState(0)
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+
+  // Readiness state
+  const [readiness, setReadiness] = useState<ReadinessData | null>(null)
+  const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const calculationAttemptedRef = useRef(false)
+  const isMountedRef = useRef(true)
+
+  // Real-time partner tracking (for progress display)
   const { partnerProgress, isPartnerActive } = useGameRealtime(
     roomId,
     user?.id || ''
   )
 
-  // Game readiness tracking - ALWAYS enabled to check readiness first
-  const {
-    ready: bothPlayersReady,
-    progress,
-    isLoading: readinessLoading,
-    refetch: refetchReadiness,
-  } = useGameReadiness(roomId, {
-    enabled: !result && !isCalculating, // Stop polling when calculating or result exists
-    pollInterval: 5000, // Check every 5 seconds to reduce load
-    onReady: () => {
-      console.log('useGameReadiness onReady callback - both players ready!')
-      // Logic is handled in main useEffect, don't duplicate here
-    },
-  })
+  // Cleanup on unmount
+  useEffect(() => {
+    isMountedRef.current = true
+    return () => {
+      isMountedRef.current = false
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current)
+      }
+    }
+  }, [])
 
   // Fetch category name
   useEffect(() => {
     async function fetchCategory() {
       if (!result?.category_id) return
-
       const supabase = createClient()
       const { data } = await supabase
         .from('categories')
         .select('name')
         .eq('id', result.category_id)
         .single()
-
-      if (data) {
-        setCategoryName(data.name)
-      }
+      if (data && isMountedRef.current) setCategoryName(data.name)
     }
-
     fetchCategory()
   }, [result?.category_id])
 
@@ -95,7 +117,6 @@ export default function ResultPage() {
           .from('subcategories')
           .select('id')
           .eq('category_id', room.category_id)
-
         const subcategoryIds = subcategories?.map(s => s.id) || []
         questionsQuery = supabase
           .from('questions')
@@ -105,102 +126,200 @@ export default function ResultPage() {
       }
 
       const { data: questions } = await questionsQuery
-      setTotalQuestions(questions?.length || 0)
+      if (isMountedRef.current) setTotalQuestions(questions?.length || 0)
     }
-    if (roomId) {
-      fetchQuestionCount()
-    }
+    if (roomId) fetchQuestionCount()
   }, [roomId])
 
-  // SIMPLIFIED LOGIC: Avoid infinite loops with memoized callbacks
-  const handleCalculationAttempt = useCallback(async () => {
-    if (calculationAttempted || isCalculating) return
+  // Check readiness function
+  const checkReadiness =
+    useCallback(async (): Promise<ReadinessData | null> => {
+      try {
+        const response = await fetch(`/api/game/${roomId}/readiness`)
+        if (!response.ok) {
+          throw new Error(`Readiness check failed: ${response.status}`)
+        }
+        const data: ReadinessData = await response.json()
+        if (isMountedRef.current) setReadiness(data)
+        return data
+      } catch (err) {
+        console.error('Readiness check error:', err)
+        return null
+      }
+    }, [roomId])
 
-    console.log('Attempting calculation')
-    setCalculationAttempted(true)
-    setWaitingForPartner(false)
-    setIsCalculating(true)
+  // Calculate match results
+  const performCalculation = useCallback(async () => {
+    if (calculationAttemptedRef.current) return
+    calculationAttemptedRef.current = true
+
+    if (isMountedRef.current) setPageState('calculating')
 
     try {
       await calculateMatch()
-      console.log('Calculation successful!')
-      setRetryCount(0)
-    } catch (err: any) {
-      console.error('Calculation failed:', err)
-      setWaitingForPartner(true)
-      setCalculationAttempted(false)
-    } finally {
-      setIsCalculating(false)
+      if (isMountedRef.current) setPageState('result')
+    } catch (err) {
+      console.error('Calculation error:', err)
+      if (isMountedRef.current) {
+        setErrorMessage(
+          err instanceof Error ? err.message : 'Ошибка расчёта результатов'
+        )
+      }
+      // Try to fetch existing result
+      await fetchResult()
     }
-  }, [calculationAttempted, isCalculating, calculateMatch])
+  }, [calculateMatch, fetchResult])
 
-  // Main decision logic - runs only when key states change
+  // Stop polling
+  const stopPolling = useCallback(() => {
+    if (pollIntervalRef.current) {
+      clearInterval(pollIntervalRef.current)
+      pollIntervalRef.current = null
+    }
+  }, [])
+
+  // Main flow logic
   useEffect(() => {
-    // Skip if still loading
-    if (isLoading || readinessLoading) {
-      return
-    }
+    if (!roomId) return
 
-    // If we already have result, don't do anything
+    // If we already have result, show it
     if (result) {
-      console.log('Result exists, showing it')
-      setWaitingForPartner(false)
+      setPageState('result')
+      stopPolling()
       return
     }
 
-    console.log('Decision logic:', {
-      bothPlayersReady,
-      waitingForPartner,
-      calculationAttempted,
-      progressReady: progress?.ready,
-    })
+    // Initial readiness check
+    const initCheck = async () => {
+      setPageState('loading')
+      const data = await checkReadiness()
 
-    // If not ready, ensure we're in waiting state
-    if (!bothPlayersReady && !waitingForPartner) {
-      console.log('Setting waiting for partner')
-      setWaitingForPartner(true)
-      setCalculationAttempted(false)
-      return
+      if (!data || !isMountedRef.current) {
+        setPageState('waiting')
+        return
+      }
+
+      // If result already exists, fetch it
+      if (data.resultExists) {
+        await fetchResult()
+        if (isMountedRef.current) setPageState('result')
+        return
+      }
+
+      // If both ready, calculate
+      if (data.ready) {
+        await performCalculation()
+        return
+      }
+
+      // Otherwise, wait and poll
+      if (isMountedRef.current) setPageState('waiting')
     }
 
-    // If ready and not waiting and not attempted - calculate
-    if (bothPlayersReady && !calculationAttempted && !isCalculating) {
-      console.log('Both ready, triggering calculation')
-      handleCalculationAttempt()
-      return
+    initCheck()
+
+    // Start polling for readiness
+    pollIntervalRef.current = setInterval(async () => {
+      if (!isMountedRef.current) return
+      if (calculationAttemptedRef.current) return
+
+      const data = await checkReadiness()
+      if (!data || !isMountedRef.current) return
+
+      // If result exists, fetch it
+      if (data.resultExists) {
+        stopPolling()
+        await fetchResult()
+        if (isMountedRef.current) setPageState('result')
+        return
+      }
+
+      // If both ready, calculate
+      if (data.ready && !calculationAttemptedRef.current) {
+        stopPolling()
+        await performCalculation()
+      }
+    }, 3000)
+
+    return () => {
+      stopPolling()
     }
   }, [
-    isLoading,
+    roomId,
     result,
-    readinessLoading,
-    bothPlayersReady,
-    waitingForPartner,
-    calculationAttempted,
-    isCalculating,
-    handleCalculationAttempt,
+    checkReadiness,
+    fetchResult,
+    performCalculation,
+    stopPolling,
   ])
+
+  // Update state when result loads
+  useEffect(() => {
+    if (result && pageState !== 'result') {
+      setPageState('result')
+      stopPolling()
+    }
+  }, [result, pageState, stopPolling])
+
+  // Handle error from result hook
+  useEffect(() => {
+    if (resultError && pageState !== 'waiting' && pageState !== 'result') {
+      setErrorMessage(resultError)
+      if (!readiness?.ready) {
+        setPageState('waiting')
+      } else {
+        setPageState('error')
+      }
+    }
+  }, [resultError, pageState, readiness?.ready])
 
   const handlePlayAgain = useCallback(() => {
     router.push('/categories')
   }, [router])
 
   const handleRetry = useCallback(async () => {
-    console.log('Manual retry triggered')
-    setWaitingForPartner(true)
-    setCalculationAttempted(false)
-    setRetryCount(0)
-    setIsCalculating(false)
+    setPageState('loading')
+    setErrorMessage(null)
+    calculationAttemptedRef.current = false
 
-    // Force refresh readiness check
-    await refetchReadiness()
-  }, [refetchReadiness])
+    const data = await checkReadiness()
+    if (data?.resultExists) {
+      await fetchResult()
+      setPageState('result')
+    } else if (data?.ready) {
+      await performCalculation()
+    } else {
+      setPageState('waiting')
+    }
+  }, [checkReadiness, fetchResult, performCalculation])
 
-  // Loading state - also include readiness loading
-  if (isLoading || isCalculating || readinessLoading) {
+  // Calculate partner progress for display
+  const getPartnerProgressForDisplay = useCallback(() => {
+    if (!readiness || !user?.id) return partnerProgress
+    const isHost = readiness.room.hostId === user.id
+    return isHost
+      ? readiness.progress.guest.count
+      : readiness.progress.host.count
+  }, [readiness, user?.id, partnerProgress])
+
+  // ========== RENDER BASED ON STATE ==========
+
+  // Loading state
+  if (pageState === 'loading' || isResultLoading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen p-4">
         <Loader2 className="w-12 h-12 animate-spin text-primary mb-4" />
-        <p className="text-lg font-medium">Подсчитываем результаты...</p>
+        <p className="text-lg font-medium">Загружаем результаты...</p>
+      </div>
+    )
+  }
+
+  // Calculating state
+  if (pageState === 'calculating') {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen p-4">
+        <Loader2 className="w-12 h-12 animate-spin text-primary mb-4" />
+        <p className="text-lg font-medium">Подсчитываем совместимость...</p>
         <p className="text-sm text-muted-foreground mt-2">
           Анализируем ваши ответы
         </p>
@@ -208,23 +327,10 @@ export default function ResultPage() {
     )
   }
 
-  // Waiting for partner state - PRIORITY: Show this instead of errors
-  if (waitingForPartner && !result) {
-    // Use progress from readiness API if available, fallback to realtime
-    const currentProgress =
-      progress?.total > 0
-        ? user?.id === progress.room?.hostId
-          ? progress.guest?.count || 0
-          : progress.host?.count || 0
-        : partnerProgress
-
-    const currentTotal = progress?.total > 0 ? progress.total : totalQuestions
-
-    console.log('Showing waiting screen:', {
-      currentProgress,
-      currentTotal,
-      isPartnerActive,
-    })
+  // Waiting for partner state
+  if (pageState === 'waiting') {
+    const currentProgress = getPartnerProgressForDisplay()
+    const currentTotal = readiness?.progress.total || totalQuestions
 
     return (
       <WaitingForPartnerScreen
@@ -235,14 +341,14 @@ export default function ResultPage() {
     )
   }
 
-  // Error state - ONLY show if NOT waiting (waiting takes priority)
-  if (error && !result && !waitingForPartner && !readinessLoading) {
+  // Error state
+  if (pageState === 'error' && errorMessage) {
     return (
       <div className="flex flex-col items-center justify-center min-h-screen p-4">
         <AlertCircle className="w-16 h-16 text-destructive mb-4" />
         <h2 className="text-2xl font-bold mb-2">Ошибка</h2>
         <p className="text-muted-foreground text-center mb-6 max-w-md">
-          {error}
+          {errorMessage}
         </p>
         <div className="flex gap-3">
           <Button onClick={handleRetry} variant="default">
@@ -256,8 +362,8 @@ export default function ResultPage() {
     )
   }
 
-  // Success state
-  if (result) {
+  // Success state - show results
+  if (pageState === 'result' && result) {
     return (
       <GameResultDisplay
         result={result}
@@ -270,7 +376,8 @@ export default function ResultPage() {
   // Fallback
   return (
     <div className="flex flex-col items-center justify-center min-h-screen p-4">
-      <p className="text-muted-foreground">Загрузка результатов...</p>
+      <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
+      <p className="text-muted-foreground mt-4">Загрузка...</p>
     </div>
   )
 }

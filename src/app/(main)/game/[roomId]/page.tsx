@@ -148,8 +148,32 @@ export default function GamePage() {
     // Submit to backend
     submitResponseToBackend(currentQuestion.id, answer)
 
+    // Auto-add to favorites on like (right swipe)
+    if (answer === 1 && user?.id && currentRoom?.category_id) {
+      addToFavorites(currentQuestion)
+    }
+
     // Reset timer for next question
     resetTimer(20)
+  }
+
+  // Add to favorites silently (fire and forget)
+  const addToFavorites = async (question: Question) => {
+    try {
+      await fetch('/api/favorites', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: user?.id,
+          itemName: question.text,
+          categoryId: currentRoom?.category_id,
+          imageUrl: question.image_url,
+        }),
+      })
+    } catch (err) {
+      // Silent fail - favorites is a secondary feature
+      console.debug('Could not add to favorites:', err)
+    }
   }
 
   // Submit response to backend

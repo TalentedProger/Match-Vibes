@@ -2,14 +2,11 @@ import type { Metadata, Viewport } from 'next'
 import './globals.css'
 import { TelegramProvider } from '@/components/providers/telegram-provider'
 import { ThemeProvider } from '@/components/providers/theme-provider'
+import { FullscreenManager } from '@/components/fullscreen-manager'
 
 export const metadata: Metadata = {
   title: 'MatchVibe - Find Your Shared Vibe',
   description: 'Discover shared interests through interactive games',
-  themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#fafafa' },
-    { media: '(prefers-color-scheme: dark)', color: '#141419' },
-  ],
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
@@ -23,6 +20,10 @@ export const viewport: Viewport = {
   maximumScale: 1,
   userScalable: false,
   viewportFit: 'cover',
+  themeColor: [
+    { media: '(prefers-color-scheme: light)', color: '#fafafa' },
+    { media: '(prefers-color-scheme: dark)', color: '#141419' },
+  ],
 }
 
 export default function RootLayout({
@@ -41,8 +42,15 @@ export default function RootLayout({
               (function() {
                 if (window.Telegram && window.Telegram.WebApp) {
                   window.Telegram.WebApp.ready();
-                  window.Telegram.WebApp.expand();
-                  window.Telegram.WebApp.enableClosingConfirmation();
+                  // Try requestFullscreen first (Telegram 7.7+), fallback to expand
+                  if (typeof window.Telegram.WebApp.requestFullscreen === 'function') {
+                    window.Telegram.WebApp.requestFullscreen();
+                  } else {
+                    window.Telegram.WebApp.expand();
+                  }
+                  if (typeof window.Telegram.WebApp.enableClosingConfirmation === 'function') {
+                    window.Telegram.WebApp.enableClosingConfirmation();
+                  }
                 }
               })();
             `,
@@ -56,7 +64,10 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <TelegramProvider>{children}</TelegramProvider>
+          <TelegramProvider>
+            <FullscreenManager />
+            {children}
+          </TelegramProvider>
         </ThemeProvider>
       </body>
     </html>
