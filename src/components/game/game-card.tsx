@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, memo } from 'react'
 import { motion, useMotionValue, useTransform, PanInfo } from 'framer-motion'
 import { Heart, X } from 'lucide-react'
 import type { Question } from '@/types/game'
@@ -11,23 +11,22 @@ interface GameCardProps {
   disabled?: boolean
 }
 
-const SWIPE_THRESHOLD = 100
-const ROTATION_FACTOR = 0.1
-const VELOCITY_THRESHOLD = 500
+const SWIPE_THRESHOLD = 80
+const VELOCITY_THRESHOLD = 400
 
-export function GameCard({
+export const GameCard = memo(function GameCard({
   question,
   onSwipe,
   disabled = false,
 }: GameCardProps) {
   const [isDragging, setIsDragging] = useState(false)
   const x = useMotionValue(0)
-  const rotate = useTransform(x, [-200, 0, 200], [-25, 0, 25])
+  const rotate = useTransform(x, [-200, 0, 200], [-20, 0, 20])
   const opacity = useTransform(x, [-200, -100, 0, 100, 200], [0, 1, 1, 1, 0])
 
   // Calculate swipe indicators opacity
-  const likeOpacity = useTransform(x, [0, 100], [0, 1])
-  const dislikeOpacity = useTransform(x, [-100, 0], [1, 0])
+  const likeOpacity = useTransform(x, [0, 80], [0, 1])
+  const dislikeOpacity = useTransform(x, [-80, 0], [1, 0])
 
   const handleDragEnd = (_: any, info: PanInfo) => {
     setIsDragging(false)
@@ -45,15 +44,12 @@ export function GameCard({
       } else {
         onSwipe('left') // Dislike
       }
-    } else {
-      // Snap back to center
-      x.set(0)
     }
   }
 
   return (
     <motion.div
-      className="relative w-full max-w-[340px] mx-auto"
+      className="relative w-full max-w-[320px] mx-auto touch-none"
       style={{
         x,
         rotate,
@@ -62,22 +58,17 @@ export function GameCard({
       }}
       drag={disabled ? false : 'x'}
       dragConstraints={{ left: 0, right: 0 }}
-      dragElastic={0.8}
+      dragElastic={0.7}
       dragTransition={{
-        bounceStiffness: 600,
-        bounceDamping: 20,
-      }}
-      transition={{
-        type: 'spring',
-        stiffness: 300,
-        damping: 30,
+        bounceStiffness: 500,
+        bounceDamping: 25,
       }}
       onDragStart={() => setIsDragging(true)}
       onDragEnd={handleDragEnd}
       whileTap={{ cursor: 'grabbing' }}
     >
-      {/* Card */}
-      <div className="relative aspect-[3/4.2] bg-card rounded-3xl shadow-2xl overflow-hidden border border-border">
+      {/* Card - reduced aspect ratio for better fit */}
+      <div className="relative aspect-[3/3.5] bg-card rounded-2xl shadow-xl overflow-hidden border border-border">
         {/* Image - Full Height */}
         <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-secondary/10">
           {question.image_url ? (
@@ -86,17 +77,18 @@ export function GameCard({
               alt={question.text}
               className="w-full h-full object-cover"
               draggable={false}
+              loading="eager"
             />
           ) : (
-            <div className="w-full h-full flex items-center justify-center text-6xl">
+            <div className="w-full h-full flex items-center justify-center text-5xl">
               {question.text.charAt(0)}
             </div>
           )}
         </div>
 
         {/* Text Container - Semi-transparent overlay */}
-        <div className="absolute bottom-0 left-0 right-0 mx-3 mb-3 bg-background/75 backdrop-blur-md rounded-2xl px-4 py-3 shadow-lg border border-border/50">
-          <h2 className="text-xl font-bold text-center leading-tight">
+        <div className="absolute bottom-0 left-0 right-0 mx-2 mb-2 bg-background/80 backdrop-blur-sm rounded-xl px-3 py-2 shadow-md border border-border/50">
+          <h2 className="text-lg font-bold text-center leading-snug">
             {question.text}
           </h2>
         </div>
@@ -106,21 +98,21 @@ export function GameCard({
           <>
             {/* Like Indicator */}
             <motion.div
-              className="absolute top-6 right-6 pointer-events-none"
+              className="absolute top-4 right-4 pointer-events-none"
               style={{ opacity: likeOpacity }}
             >
-              <div className="flex items-center justify-center w-16 h-16 rounded-full bg-green-500/90 border-3 border-white shadow-lg">
-                <Heart className="w-8 h-8 text-white fill-white" />
+              <div className="flex items-center justify-center w-14 h-14 rounded-full bg-green-500/90 border-2 border-white shadow-lg">
+                <Heart className="w-7 h-7 text-white fill-white" />
               </div>
             </motion.div>
 
             {/* Dislike Indicator */}
             <motion.div
-              className="absolute top-6 left-6 pointer-events-none"
+              className="absolute top-4 left-4 pointer-events-none"
               style={{ opacity: dislikeOpacity }}
             >
-              <div className="flex items-center justify-center w-16 h-16 rounded-full bg-red-500/90 border-3 border-white shadow-lg">
-                <X className="w-8 h-8 text-white" strokeWidth={3} />
+              <div className="flex items-center justify-center w-14 h-14 rounded-full bg-red-500/90 border-2 border-white shadow-lg">
+                <X className="w-7 h-7 text-white" strokeWidth={3} />
               </div>
             </motion.div>
           </>
@@ -129,17 +121,17 @@ export function GameCard({
 
       {/* Swipe Hints (when not dragging) */}
       {!isDragging && !disabled && (
-        <div className="absolute -bottom-12 left-0 right-0 flex justify-center gap-8 text-sm text-muted-foreground">
-          <div className="flex items-center gap-2">
-            <X className="w-4 h-4" />
+        <div className="absolute -bottom-10 left-0 right-0 flex justify-center gap-6 text-xs text-muted-foreground">
+          <div className="flex items-center gap-1.5">
+            <X className="w-3.5 h-3.5" />
             <span>Не нравится</span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             <span>Нравится</span>
-            <Heart className="w-4 h-4" />
+            <Heart className="w-3.5 h-3.5" />
           </div>
         </div>
       )}
     </motion.div>
   )
-}
+})

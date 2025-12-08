@@ -1,5 +1,4 @@
 import { create } from 'zustand'
-import { persist } from 'zustand/middleware'
 import type { Question } from '@/types/game'
 
 export interface GameResponse {
@@ -53,128 +52,149 @@ const initialState = {
   isCompleted: false,
 }
 
-export const useGameStore = create<GameState>()(
-  persist(
-    (set, get) => ({
-      ...initialState,
+// No persistence - fresh state each session to avoid bugs
+export const useGameStore = create<GameState>()((set, get) => ({
+  ...initialState,
 
-      initGame: (roomId, categoryId, questions) => {
-        console.log('initGame called with:', {
-          roomId,
-          categoryId,
-          questionsCount: questions.length,
-        })
+  initGame: (roomId, categoryId, questions) => {
+    console.log('initGame called with:', {
+      roomId,
+      categoryId,
+      questionsCount: questions.length,
+    })
 
-        // Clear any existing game state first
-        const currentState = get()
-        if (currentState.roomId && currentState.roomId !== roomId) {
-          console.log('Switching rooms, clearing previous game state')
-        }
+    // Always start fresh when initializing a game
+    set({
+      roomId,
+      categoryId,
+      questions,
+      currentQuestionIndex: 0,
+      responses: [],
+      timeRemaining: 20,
+      isPaused: false,
+      isLoading: false,
+      error: null,
+      isCompleted: false,
+    })
+  },
 
-        set({
-          roomId,
-          categoryId,
-          questions,
-          currentQuestionIndex: 0,
-          responses: [],
-          timeRemaining: 20,
-          isPaused: false,
-          isLoading: false,
-          error: null,
-          isCompleted: false,
-        })
-      },
+  nextQuestion: () => {
+    const { currentQuestionIndex, questions, responses } = get()
+    const nextIndex = currentQuestionIndex + 1
 
-      nextQuestion: () => {
-        const { currentQuestionIndex, questions } = get()
-        if (currentQuestionIndex < questions.length - 1) {
-          set({
-            currentQuestionIndex: currentQuestionIndex + 1,
-            timeRemaining: 20,
-          })
-        } else {
-          // Game completed
-          set({ isCompleted: true })
-        }
-      },
+    console.log('nextQuestion called:', {
+      currentIndex: currentQuestionIndex,
+      nextIndex,
+      totalQuestions: questions.length,
+      responsesCount: responses.length,
+    })
 
-      previousQuestion: () => {
-        const { currentQuestionIndex } = get()
-        if (currentQuestionIndex > 0) {
-          set({
-            currentQuestionIndex: currentQuestionIndex - 1,
-            timeRemaining: 20,
-          })
-        }
-      },
-
-      submitResponse: (questionId, answer) => {
-        const { responses } = get()
-        const newResponse: GameResponse = {
-          question_id: questionId,
-          answer,
-          timestamp: Date.now(),
-        }
-
-        // Remove previous response for same question if exists
-        const filteredResponses = responses.filter(
-          r => r.question_id !== questionId
-        )
-
-        set({
-          responses: [...filteredResponses, newResponse],
-        })
-
-        // Auto-advance to next question after response
-        get().nextQuestion()
-      },
-
-      setTimeRemaining: time => {
-        set({ timeRemaining: time })
-      },
-
-      pauseTimer: () => {
-        set({ isPaused: true })
-      },
-
-      resumeTimer: () => {
-        set({ isPaused: false })
-      },
-
-      completeGame: () => {
+    // Only mark as completed when we've answered ALL questions
+    if (nextIndex >= questions.length) {
+      // Verify all questions have been answered
+      if (responses.length >= questions.length) {
+        console.log('Game completed! All questions answered.')
         set({ isCompleted: true })
-      },
-
-      resetGame: () => {
-        set(initialState)
-      },
-
-      clearGame: () => {
-        console.log('Clearing game state')
-        set({
-          ...initialState,
-          // Keep only basic state, clear everything else
-        })
-      },
-
-      setError: error => {
-        set({ error })
-      },
-
-      setLoading: loading => {
-        set({ isLoading: loading })
-      },
-    }),
-    {
-      name: 'game-storage',
-      // Only persist essential data
-      partialize: state => ({
-        roomId: state.roomId,
-        categoryId: state.categoryId,
-        questions: state.questions,
-        currentQuestionIndex: state.currentQuestionIndex,
-        responses: state.responses,
-      }),
+      } else {
+        console.log('Reached end but not all questions answered yet')
+        // Stay on last question
+      }
+    } else {
+      set({
+        currentQuestionIndex: nextIndex,
+        timeRemaining: 20,
+      })
     }
-  )
-)
+  },
+
+  previousQuestion: () => {
+    const { currentQuestionIndex } = get()
+    if (currentQuestionIndex > 0) {
+      set({
+        currentQuestionIndex: currentQuestionIndex - 1,
+        timeRemaining: 20,
+      })
+    }
+  },
+
+  submitResponse: (questionId, answer) => {
+    const { responses, questions, currentQuestionIndex } = get()
+
+    console.log('submitResponse called:', {
+      questionId,
+      answer,
+      currentIndex: currentQuestionIndex,
+      totalQuestions: questions.length,
+      currentResponsesCount: responses.length,
+    })
+
+    const newResponse: GameResponse = {
+      question_id: questionId,
+      answer,
+      timestamp: Date.now(),
+    }
+
+    // Remove previous response for same question if exists
+    const filteredResponses = responses.filter(
+      r => r.question_id !== questionId
+    )
+
+    const updatedResponses = [...filteredResponses, newResponse]
+
+    set({
+      responses: updatedResponses,
+    })
+
+    // Check if this was the last question
+    const isLastQuestion = currentQuestionIndex >= questions.length - 1
+    const allAnswered = updatedResponses.length >= questions.length
+
+    console.log('After submit:', {
+      isLastQuestion,
+      allAnswered,
+      responsesCount: updatedResponses.length,
+    })
+
+    if (isLastQuestion && allAnswered) {
+      // Game completed
+      console.log('Game completed after last answer!')
+      set({ isCompleted: true })
+    } else if (!isLastQuestion) {
+      // Move to next question
+      get().nextQuestion()
+    }
+  },
+
+  setTimeRemaining: time => {
+    set({ timeRemaining: time })
+  },
+
+  pauseTimer: () => {
+    set({ isPaused: true })
+  },
+
+  resumeTimer: () => {
+    set({ isPaused: false })
+  },
+
+  completeGame: () => {
+    set({ isCompleted: true })
+  },
+
+  resetGame: () => {
+    set(initialState)
+  },
+
+  clearGame: () => {
+    console.log('Clearing game state')
+    set(initialState)
+  },
+
+  setError: error => {
+    set({ error })
+  },
+
+  setLoading: loading => {
+    set({ isLoading: loading })
+  },
+}))

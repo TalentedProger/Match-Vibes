@@ -86,6 +86,14 @@ export async function GET(request: NextRequest) {
       const result = room.results?.[0]
       const cat = room.categories
 
+      // Parse match_percentage - it may come as string from Supabase
+      const rawPercentage = result?.match_percentage
+      const matchPercentage = rawPercentage
+        ? typeof rawPercentage === 'string'
+          ? parseFloat(rawPercentage)
+          : rawPercentage
+        : 0
+
       return {
         id: result?.id || room.id,
         roomId: room.id,
@@ -96,7 +104,7 @@ export async function GET(request: NextRequest) {
         categoryId: room.category_id,
         categoryName: cat?.name || 'Unknown',
         categoryIcon: cat?.icon || '❓',
-        matchPercentage: result?.match_percentage || 0,
+        matchPercentage: Math.round(matchPercentage),
         hostFavorite: result?.host_favorite || '',
         guestFavorite: result?.guest_favorite || '',
         sharedItem: result?.shared_item || null,

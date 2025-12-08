@@ -199,7 +199,17 @@ export default function GamePage() {
 
   // Redirect to results when game is complete
   useEffect(() => {
-    if (isCompleted && responses.length === questions.length) {
+    // Only redirect if truly completed with all answers
+    if (
+      isCompleted &&
+      questions.length > 0 &&
+      responses.length >= questions.length
+    ) {
+      console.log('Game completed, redirecting to results:', {
+        isCompleted,
+        questionsCount: questions.length,
+        responsesCount: responses.length,
+      })
       router.push(`/game/${roomId}/result`)
     }
   }, [isCompleted, responses.length, questions.length, roomId, router])
@@ -241,11 +251,11 @@ export default function GamePage() {
 
   return (
     <AuthGuard>
-      <div className="min-h-screen flex flex-col bg-background">
+      <div className="min-h-screen flex flex-col bg-background pb-[var(--tg-content-safe-area-bottom,0px)]">
         {/* Partner Progress (sticky at top) */}
         {currentRoom?.guest_id && (
           <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-lg border-b border-border">
-            <div className="container max-w-2xl mx-auto px-4 py-3">
+            <div className="container max-w-2xl mx-auto px-4 py-2">
               <PartnerProgress
                 progress={partnerProgress}
                 total={questions.length}
@@ -256,24 +266,20 @@ export default function GamePage() {
         )}
 
         {/* Main Game Area */}
-        <div className="flex-1 flex flex-col items-center justify-center px-4 pt-2">
+        <div className="flex-1 flex flex-col items-center justify-center px-3 py-2">
           {/* Question Counter and Timer Header */}
-          <div className="w-full max-w-sm mx-auto mb-6 flex items-center justify-between px-2">
-            <div className="flex items-center gap-2">
-              <MessageCircleQuestion className="w-5 h-5 text-primary" />
-              <span className="text-base font-semibold text-foreground">
-                Вопрос:{' '}
+          <div className="w-full max-w-sm mx-auto mb-3 flex items-center justify-between px-1">
+            <div className="flex items-center gap-1.5">
+              <MessageCircleQuestion className="w-4 h-4 text-primary" />
+              <span className="text-sm font-semibold text-foreground">
                 <span className="text-primary">{currentQuestionIndex + 1}</span>
                 /{questions.length}
               </span>
             </div>
-            <div className="flex items-center gap-2">
-              <Clock className="w-5 h-5 text-primary" />
-              <span className="text-base font-semibold text-foreground">
-                Время:{' '}
-                <span className="text-primary font-bold">
-                  {timeRemaining}сек
-                </span>
+            <div className="flex items-center gap-1.5">
+              <Clock className="w-4 h-4 text-primary" />
+              <span className="text-sm font-semibold text-foreground">
+                <span className="text-primary font-bold">{timeRemaining}с</span>
               </span>
             </div>
           </div>
@@ -282,15 +288,16 @@ export default function GamePage() {
             {currentQuestion ? (
               <motion.div
                 key={currentQuestion.id}
-                initial={{ opacity: 0, scale: 0.9, y: 20 }}
-                animate={{ opacity: 1, scale: 1, y: 0 }}
-                exit={{ opacity: 0, scale: 0.9, y: -20 }}
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
                 transition={{
                   type: 'spring',
-                  stiffness: 260,
-                  damping: 20,
+                  stiffness: 300,
+                  damping: 25,
+                  duration: 0.2,
                 }}
-                className="w-full max-w-[340px] mx-auto"
+                className="w-full max-w-[320px] mx-auto"
               >
                 <GameCard
                   question={currentQuestion}

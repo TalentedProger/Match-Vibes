@@ -2,7 +2,7 @@ import type { Metadata, Viewport } from 'next'
 import './globals.css'
 import { TelegramProvider } from '@/components/providers/telegram-provider'
 import { ThemeProvider } from '@/components/providers/theme-provider'
-import { FullscreenManager } from '@/components/fullscreen-manager'
+import { TelegramSafeArea } from '@/components/telegram-safe-area'
 
 export const metadata: Metadata = {
   title: 'MatchVibe - Find Your Shared Vibe',
@@ -42,14 +42,15 @@ export default function RootLayout({
               (function() {
                 if (window.Telegram && window.Telegram.WebApp) {
                   window.Telegram.WebApp.ready();
+                  // Set initial CSS variables for safe areas
+                  document.documentElement.style.setProperty('--tg-safe-bottom', '80px');
+                  document.documentElement.style.setProperty('--tg-safe-top', '0px');
+                  document.documentElement.style.setProperty('--tg-content-padding', '16px');
                   // Try requestFullscreen first (Telegram 7.7+), fallback to expand
                   if (typeof window.Telegram.WebApp.requestFullscreen === 'function') {
                     window.Telegram.WebApp.requestFullscreen();
                   } else {
                     window.Telegram.WebApp.expand();
-                  }
-                  if (typeof window.Telegram.WebApp.enableClosingConfirmation === 'function') {
-                    window.Telegram.WebApp.enableClosingConfirmation();
                   }
                 }
               })();
@@ -65,8 +66,10 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <TelegramProvider>
-            <FullscreenManager />
-            {children}
+            <TelegramSafeArea />
+            <div className="pb-[calc(var(--tg-safe-bottom,0px)+var(--tg-content-padding,0px))]">
+              {children}
+            </div>
           </TelegramProvider>
         </ThemeProvider>
       </body>

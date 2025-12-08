@@ -217,8 +217,8 @@ function EmptyState() {
 
 function getMatchBgColor(percentage: number): string {
   if (percentage >= 70) return 'bg-gradient-to-br from-green-400 to-green-600'
-  if (percentage >= 50) return 'bg-gradient-to-br from-yellow-400 to-yellow-600'
-  return 'bg-gradient-to-br from-orange-400 to-orange-600'
+  if (percentage >= 50) return 'bg-gradient-to-br from-amber-400 to-amber-600'
+  return 'bg-gradient-to-br from-red-400 to-red-600'
 }
 
 function formatFullDate(dateString: string): string {
