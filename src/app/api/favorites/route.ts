@@ -1,23 +1,15 @@
-import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
 import type {
   Favorite,
   FavoritesByCategory,
   FavoritesResponse,
 } from '@/types/favorites'
 
-// Helper to create supabase client inside request handlers
-function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  )
-}
-
 // GET - получить избранное пользователя
 export async function GET(request: NextRequest) {
   try {
-    const supabase = getSupabase()
+    const supabase = await createClient()
     const { searchParams } = new URL(request.url)
     const userId = searchParams.get('userId')
     const categoryId = searchParams.get('categoryId')
@@ -26,8 +18,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'userId is required' }, { status: 400 })
     }
 
+    // Use raw query since favorites table might not be in types
     let query = supabase
-      .from('favorites')
+      .from('favorites' as any)
       .select(
         `
         id,
@@ -57,15 +50,14 @@ export async function GET(request: NextRequest) {
     }
 
     // Transform data
-    const favorites: Favorite[] = data.map((item: Record<string, unknown>) => ({
+    const favorites: Favorite[] = (data || []).map((item: any) => ({
       id: item.id as string,
       userId: item.user_id as string,
       itemName: item.item_name as string,
       categoryId: item.category_id as string,
       imageUrl: item.image_url as string | null,
-      categoryName:
-        (item.categories as Record<string, string>)?.name || 'Без категории',
-      categoryIcon: (item.categories as Record<string, string>)?.icon || '📁',
+      categoryName: item.categories?.name || 'Без категории',
+      categoryIcon: item.categories?.icon || '📁',
       addedAt: item.added_at as string,
     }))
 
@@ -103,7 +95,7 @@ export async function GET(request: NextRequest) {
 // POST - добавить в избранное
 export async function POST(request: NextRequest) {
   try {
-    const supabase = getSupabase()
+    const supabase = await createClient()
     const body = await request.json()
     const { userId, itemName, categoryId, imageUrl } = body
 
@@ -116,7 +108,7 @@ export async function POST(request: NextRequest) {
 
     // Проверяем, нет ли уже такого элемента в избранном
     const { data: existing } = await supabase
-      .from('favorites')
+      .from('favorites' as any)
       .select('id')
       .eq('user_id', userId)
       .eq('item_name', itemName)
@@ -131,7 +123,7 @@ export async function POST(request: NextRequest) {
     }
 
     const { data, error } = await supabase
-      .from('favorites')
+      .from('favorites' as any)
       .insert({
         user_id: userId,
         item_name: itemName,
@@ -159,7 +151,7 @@ export async function POST(request: NextRequest) {
 // DELETE - удалить из избранного
 export async function DELETE(request: NextRequest) {
   try {
-    const supabase = getSupabase()
+    const supabase = await createClient()
     const { searchParams } = new URL(request.url)
     const favoriteId = searchParams.get('id')
     const userId = searchParams.get('userId')
@@ -172,7 +164,7 @@ export async function DELETE(request: NextRequest) {
     }
 
     const { error } = await supabase
-      .from('favorites')
+      .from('favorites' as any)
       .delete()
       .eq('id', favoriteId)
       .eq('user_id', userId) // Защита: пользователь может удалить только свои избранные
