@@ -36,8 +36,8 @@ export default function Home() {
       : 'Погнали! 🚀'
 
   return (
-    <main className="min-h-[100dvh] flex flex-col justify-center p-4 sm:p-6 overflow-y-auto">
-      <div className="flex flex-col space-y-6 max-w-md w-full mx-auto my-auto py-8">
+    <main className="min-h-[100dvh] flex flex-col items-center justify-center p-4 sm:p-6">
+      <div className="flex flex-col space-y-6 max-w-md w-full mx-auto py-8">
         {/* Header Section */}
         <div className="text-center space-y-3">
           {/* Logo/Icon */}

@@ -31,15 +31,18 @@ export function AchievementCard({
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.05, duration: 0.3 }}
-      className={`relative overflow-hidden rounded-2xl border transition-all duration-300 ${
-        isUnlocked
-          ? 'bg-card border-border shadow-lg'
-          : 'bg-card/50 border-border/50'
+      className={`relative overflow-hidden rounded-2xl transition-all duration-300 ${
+        isUnlocked ? 'bg-card shadow-lg' : 'bg-card/50'
       }`}
+      style={{
+        border: isUnlocked
+          ? '1px solid hsl(var(--border))'
+          : '1px solid hsl(var(--border) / 0.5)',
+        boxShadow: isUnlocked
+          ? `0 0 0 1px ${rarity === 'legendary' ? 'rgba(245, 158, 11, 0.3)' : rarity === 'epic' ? 'rgba(168, 85, 247, 0.3)' : rarity === 'rare' ? 'rgba(59, 130, 246, 0.3)' : 'rgba(107, 114, 128, 0.2)'}`
+          : 'none',
+      }}
     >
-      {/* Rarity gradient stripe at top */}
-      <div className={`h-1 w-full bg-gradient-to-r ${RARITY_COLORS[rarity]}`} />
-
       <div className="p-4">
         <div className="flex items-start gap-4">
           {/* Icon container */}

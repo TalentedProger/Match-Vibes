@@ -1,18 +1,52 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { AuthGuard } from '@/components/auth/auth-guard'
 import { ProfileHeader } from '@/components/profile/profile-header'
 import { ProfileStats } from '@/components/profile/profile-stats'
 import { useAuth } from '@/hooks/use-auth'
 import { useUser } from '@/hooks/use-user'
-import { Settings, Share2, Heart } from 'lucide-react'
+import { Settings, Share2, Heart, Check } from 'lucide-react'
 import Link from 'next/link'
 
 export default function ProfilePage() {
   const { user } = useAuth()
   const { stats, isLoadingStats } = useUser()
   const [isEditing, setIsEditing] = useState(false)
+  const [shareSuccess, setShareSuccess] = useState(false)
+
+  const handleShare = useCallback(() => {
+    const webApp = (window as any).Telegram?.WebApp
+    if (!webApp || !user) return
+
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://your-app-url.com'
+    const shareUrl = `${appUrl}/profile/${user.id}`
+
+    const shareText =
+      `🎮 Смотри мой профиль в MatchVibe!\n\n` +
+      `${user.firstName || user.username} уже сыграл ${stats?.gamesPlayed || 0} игр!\n` +
+      `💫 Средняя совместимость: ${stats?.avgCompatibility || 0}%\n\n` +
+      `Присоединяйся и найди свой общий вайб с друзьями!`
+
+    // Используем Telegram share
+    if (typeof webApp.switchInlineQuery === 'function') {
+      webApp.switchInlineQuery(shareText, ['users', 'groups', 'channels'])
+    } else {
+      // Fallback - копируем в буфер обмена
+      navigator.clipboard
+        .writeText(`${shareText}\n\n${shareUrl}`)
+        .then(() => {
+          setShareSuccess(true)
+          setTimeout(() => setShareSuccess(false), 2000)
+        })
+        .catch(() => {
+          // Ещё один fallback - открываем Telegram share
+          webApp.openTelegramLink(
+            `https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(shareText)}`
+          )
+        })
+    }
+  }, [user, stats])
 
   return (
     <AuthGuard>
@@ -51,14 +85,25 @@ export default function ProfilePage() {
             </div>
           </Link>
 
-          <button className="flex items-center gap-3 p-4 bg-card rounded-xl hover:bg-muted transition-colors w-full">
+          <button
+            onClick={handleShare}
+            className="flex items-center gap-3 p-4 bg-card rounded-xl hover:bg-muted transition-colors w-full"
+          >
             <div className="flex-shrink-0 w-10 h-10 bg-blue-500/10 rounded-full flex items-center justify-center">
-              <Share2 className="h-5 w-5 text-blue-500" />
+              {shareSuccess ? (
+                <Check className="h-5 w-5 text-green-500" />
+              ) : (
+                <Share2 className="h-5 w-5 text-blue-500" />
+              )}
             </div>
             <div className="flex-1 text-left">
-              <div className="font-medium text-foreground">Поделиться</div>
+              <div className="font-medium text-foreground">
+                {shareSuccess ? 'Скопировано!' : 'Поделиться'}
+              </div>
               <div className="text-sm text-muted-foreground">
-                Поделитесь своим профилем
+                {shareSuccess
+                  ? 'Ссылка скопирована в буфер'
+                  : 'Поделитесь своим профилем'}
               </div>
             </div>
           </button>

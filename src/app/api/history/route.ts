@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
 
     const supabase = await createClient()
 
-    // Fetch completed rooms with results
+    // Fetch completed rooms (without nested results - they may not have FK relation)
     const {
       data: rooms,
       error: roomsError,
@@ -40,13 +40,6 @@ export async function GET(request: NextRequest) {
           id,
           name,
           icon
-        ),
-        results (
-          id,
-          match_percentage,
-          host_favorite,
-          guest_favorite,
-          shared_item
         )
       `,
         { count: 'exact' }
@@ -63,6 +56,19 @@ export async function GET(request: NextRequest) {
         { status: 500 }
       )
     }
+
+    // Fetch results separately for user
+    const { data: results, error: resultsError } = await (supabase as any)
+      .from('results')
+      .select('*')
+      .or(`host_id.eq.${userId},guest_id.eq.${userId}`)
+
+    if (resultsError) {
+      console.error('Error fetching results:', resultsError)
+    }
+
+    // Create a map of room_id -> result for quick lookup
+    const resultsMap = new Map((results || []).map((r: any) => [r.room_id, r]))
 
     // Collect partner IDs
     const partnerIds = new Set<string>()
@@ -83,25 +89,17 @@ export async function GET(request: NextRequest) {
     const history: GameHistoryItem[] = (rooms || []).map((room: any) => {
       const partnerId = room.host_id === userId ? room.guest_id : room.host_id
       const partner = partnerMap.get(partnerId)
-      const result = room.results?.[0]
+      const result = resultsMap.get(room.id)
       const cat = room.categories
 
       // Parse match_percentage - it may come as string from Supabase
       const rawPercentage = result?.match_percentage
-      const matchPercentage = rawPercentage
-        ? typeof rawPercentage === 'string'
-          ? parseFloat(rawPercentage)
-          : Number(rawPercentage)
-        : 0
-
-      // Debug logging
-      console.log('Room processing:', {
-        roomId: room.id,
-        hasResult: !!result,
-        rawPercentage,
-        parsedPercentage: matchPercentage,
-        resultObj: result,
-      })
+      const matchPercentage =
+        rawPercentage != null
+          ? typeof rawPercentage === 'string'
+            ? parseFloat(rawPercentage)
+            : Number(rawPercentage)
+          : 0
 
       return {
         id: result?.id || room.id,

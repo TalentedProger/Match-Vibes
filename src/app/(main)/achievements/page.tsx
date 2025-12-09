@@ -134,7 +134,10 @@ export default function AchievementsPage() {
           )}
 
           {/* Filter Tabs */}
-          <div className="flex items-center gap-2 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-hide">
+          <div
+            className="flex items-center gap-2 overflow-x-auto overflow-y-hidden -mx-4 px-4 [&::-webkit-scrollbar]:hidden"
+            style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+          >
             <Filter className="w-4 h-4 text-muted-foreground flex-shrink-0" />
             {filterOptions.map(option => (
               <button

@@ -48,7 +48,7 @@ export function GameHistoryCarousel({
       </h3>
 
       <div
-        className="flex gap-3 overflow-x-auto -mx-4 px-4 [&::-webkit-scrollbar]:hidden"
+        className="flex gap-3 overflow-x-auto overflow-y-hidden -mx-4 px-4 [&::-webkit-scrollbar]:hidden"
         style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
       >
         {games.map((game, index) => (
