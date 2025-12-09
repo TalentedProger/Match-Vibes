@@ -39,7 +39,7 @@ export default function AchievementsPage() {
     <AuthGuard>
       <div className="min-h-screen bg-background pb-24">
         {/* Header */}
-        <div className="sticky top-0 z-20 bg-background/80 backdrop-blur-lg border-b border-border">
+        <div className="sticky top-[56px] z-20 bg-background/80 backdrop-blur-lg border-b border-border">
           <div className="container max-w-2xl mx-auto px-4 py-4">
             <div className="flex items-center gap-4">
               <button

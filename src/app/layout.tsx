@@ -47,7 +47,7 @@ export default function RootLayout({
                   document.documentElement.style.setProperty('--tg-safe-bottom', '80px');
                   document.documentElement.style.setProperty('--tg-safe-top', '0px');
                   document.documentElement.style.setProperty('--tg-content-padding', '16px');
-                  document.documentElement.style.setProperty('--tg-nav-height', '0px');
+                  document.documentElement.style.setProperty('--tg-nav-height', '56px');
                   // Try requestFullscreen first (Telegram 7.7+), fallback to expand
                   if (typeof window.Telegram.WebApp.requestFullscreen === 'function') {
                     window.Telegram.WebApp.requestFullscreen();
@@ -69,8 +69,9 @@ export default function RootLayout({
         >
           <TelegramProvider>
             <TelegramSafeArea />
+            {/* TelegramNavigation создает физический отступ под кнопками Telegram */}
             <TelegramNavigation />
-            <div className="pt-[var(--tg-nav-height,0px)] pb-[calc(var(--tg-safe-bottom,0px)+var(--tg-content-padding,0px))] mt-[var(--tg-content-padding,16px)]">
+            <div className="pb-[calc(var(--tg-safe-bottom,0px)+var(--tg-content-padding,0px))]">
               {children}
             </div>
           </TelegramProvider>

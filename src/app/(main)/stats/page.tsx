@@ -24,7 +24,7 @@ export default function StatsPage() {
     <AuthGuard>
       <div className="min-h-screen bg-background">
         {/* Header */}
-        <div className="sticky top-0 z-10 bg-background/80 backdrop-blur-md border-b border-border">
+        <div className="sticky top-[56px] z-10 bg-background/80 backdrop-blur-md border-b border-border">
           <div className="container max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
             <div className="flex items-center gap-3">
               <Link

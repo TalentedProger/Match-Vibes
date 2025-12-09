@@ -2,90 +2,52 @@
 
 import { useEffect, useState } from 'react'
 
+// Фиксированная высота для навигационных кнопок Telegram (кнопка закрыть, меню и т.д.)
+// Эти кнопки ВСЕГДА присутствуют в верхней части Mini App
+const TELEGRAM_HEADER_HEIGHT = 56 // Высота стандартной панели Telegram с кнопками
+
 /**
  * TelegramNavigation Component
- * Container for Telegram's native navigation buttons
- * Creates proper spacing and layout consideration for the buttons
+ * Creates proper spacing for Telegram's native navigation buttons
+ * These buttons (Close, Menu, Options) are ALWAYS present at the top
  */
 export function TelegramNavigation() {
-  const [buttonHeight, setButtonHeight] = useState(0)
+  const [isReady, setIsReady] = useState(false)
 
   useEffect(() => {
     if (typeof window === 'undefined') return
 
     const webApp = (window as any).Telegram?.WebApp
-    if (!webApp) return
 
-    // Function to calculate button container height
-    const updateButtonHeight = () => {
-      // Check if we have Telegram navigation buttons visible
-      const hasBackButton = webApp.BackButton?.isVisible || false
-      const hasMainButton = webApp.MainButton?.isVisible || false
-      const hasSecondaryButton = webApp.SecondaryButton?.isVisible || false
-
-      // Calculate the height needed for the button container
-      let height = 0
-
-      if (hasBackButton || hasMainButton || hasSecondaryButton) {
-        // Standard Telegram button height + top padding + bottom margin
-        height = 60 // Button height (44px) + top padding (8px) + bottom margin (8px)
-      }
-
-      setButtonHeight(height)
-
-      // Update CSS variable for other components to use
+    // Устанавливаем CSS переменную сразу, даже если WebApp не доступен
+    // Кнопки Telegram всегда присутствуют когда приложение открыто в Telegram
+    const setNavHeight = () => {
       document.documentElement.style.setProperty(
         '--tg-nav-height',
-        `${height}px`
+        `${TELEGRAM_HEADER_HEIGHT}px`
       )
+      setIsReady(true)
 
-      console.log('Telegram navigation updated:', {
-        hasBackButton,
-        hasMainButton,
-        hasSecondaryButton,
-        height: `${height}px`,
+      console.log('Telegram navigation height set:', {
+        height: TELEGRAM_HEADER_HEIGHT,
+        isTelegram: !!webApp,
       })
     }
 
-    // Initial update
-    updateButtonHeight()
-
-    // Monitor button changes
-    const checkButtons = () => {
-      updateButtonHeight()
-    }
-
-    // Check periodically for button changes
-    const interval = setInterval(checkButtons, 500)
-
-    // Listen for events if available
-    if (typeof webApp.onEvent === 'function') {
-      webApp.onEvent('backButtonClicked', updateButtonHeight)
-      webApp.onEvent('mainButtonClicked', updateButtonHeight)
-    }
-
-    return () => {
-      clearInterval(interval)
-      if (typeof webApp.offEvent === 'function') {
-        webApp.offEvent('backButtonClicked', updateButtonHeight)
-        webApp.offEvent('mainButtonClicked', updateButtonHeight)
-      }
-    }
+    // Устанавливаем высоту сразу
+    setNavHeight()
   }, [])
 
-  // Only render container if we have navigation buttons
-  if (buttonHeight === 0) {
-    return null
-  }
-
+  // Рендерим невидимый контейнер-распорку для отступа
+  // Это создает физическое пространство под кнопками Telegram
   return (
     <div
-      className="fixed top-0 left-0 right-0 z-50 pointer-events-none"
-      style={{ height: `${buttonHeight}px` }}
-    >
-      {/* This is a placeholder container for Telegram's navigation buttons */}
-      {/* The actual buttons are rendered by Telegram WebApp SDK */}
-      <div className="w-full h-full bg-transparent" />
-    </div>
+      className="w-full bg-transparent pointer-events-none"
+      style={{
+        height: `${TELEGRAM_HEADER_HEIGHT}px`,
+        minHeight: `${TELEGRAM_HEADER_HEIGHT}px`,
+      }}
+      aria-hidden="true"
+    />
   )
 }
