@@ -37,14 +37,17 @@ export function StatsOverview({
       value: matches,
       icon: '✨',
       color: 'from-purple-500 to-purple-600',
-      subValue: null,
+      subValue: `${Math.round((matches / Math.max(gamesPlayed, 1)) * 100)}% успеха`,
     },
     {
       label: 'Друзей',
       value: friends,
       icon: '👥',
       color: 'from-green-500 to-green-600',
-      subValue: null,
+      subValue:
+        friends > 0
+          ? `${Math.max(1, Math.round(gamesPlayed / Math.max(friends, 1)))} игр/друг`
+          : 'Пока нет друзей',
     },
     {
       label: 'Средняя совместимость',
@@ -76,11 +79,9 @@ export function StatsOverview({
             <div className="text-2xl font-bold text-foreground">
               {stat.value}
             </div>
-            {stat.subValue && (
-              <p className="text-xs text-muted-foreground mt-1">
-                {stat.subValue}
-              </p>
-            )}
+            <p className="text-xs text-muted-foreground mt-1">
+              {stat.subValue || '—'}
+            </p>
           </motion.div>
         ))}
       </div>
@@ -120,23 +121,24 @@ export function StatsOverview({
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ delay: 0.5 }}
-        className="bg-card rounded-2xl p-4 shadow-sm"
+        className="bg-gradient-to-br from-indigo-500/20 via-purple-500/20 to-pink-500/20 rounded-2xl p-4 shadow-sm border border-purple-500/30"
       >
-        <h4 className="text-sm font-medium text-muted-foreground mb-3">
+        <h4 className="text-sm font-medium text-foreground mb-4 flex items-center gap-2">
+          <span>📊</span>
           Активность
         </h4>
-        <div className="flex justify-between">
-          <div className="text-center">
+        <div className="grid grid-cols-3 gap-3">
+          <div className="bg-background/60 backdrop-blur-sm rounded-xl p-3 text-center border border-border/50">
             <p className="text-xl font-bold text-foreground">{gamesThisWeek}</p>
             <p className="text-xs text-muted-foreground">за неделю</p>
           </div>
-          <div className="text-center">
+          <div className="bg-background/60 backdrop-blur-sm rounded-xl p-3 text-center border border-border/50">
             <p className="text-xl font-bold text-foreground">
               {gamesThisMonth}
             </p>
             <p className="text-xs text-muted-foreground">за месяц</p>
           </div>
-          <div className="text-center">
+          <div className="bg-background/60 backdrop-blur-sm rounded-xl p-3 text-center border border-border/50">
             <p className="text-xl font-bold text-foreground">{gamesPlayed}</p>
             <p className="text-xs text-muted-foreground">всего</p>
           </div>

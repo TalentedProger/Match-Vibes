@@ -47,7 +47,10 @@ export function GameHistoryCarousel({
         Недавние игры
       </h3>
 
-      <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-hide">
+      <div
+        className="flex gap-3 overflow-x-auto -mx-4 px-4 [&::-webkit-scrollbar]:hidden"
+        style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+      >
         {games.map((game, index) => (
           <motion.button
             key={game.id}

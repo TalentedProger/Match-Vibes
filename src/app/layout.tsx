@@ -3,6 +3,7 @@ import './globals.css'
 import { TelegramProvider } from '@/components/providers/telegram-provider'
 import { ThemeProvider } from '@/components/providers/theme-provider'
 import { TelegramSafeArea } from '@/components/telegram-safe-area'
+import { TelegramNavigation } from '@/components/telegram-navigation'
 
 export const metadata: Metadata = {
   title: 'MatchVibe - Find Your Shared Vibe',
@@ -46,6 +47,7 @@ export default function RootLayout({
                   document.documentElement.style.setProperty('--tg-safe-bottom', '80px');
                   document.documentElement.style.setProperty('--tg-safe-top', '0px');
                   document.documentElement.style.setProperty('--tg-content-padding', '16px');
+                  document.documentElement.style.setProperty('--tg-nav-height', '0px');
                   // Try requestFullscreen first (Telegram 7.7+), fallback to expand
                   if (typeof window.Telegram.WebApp.requestFullscreen === 'function') {
                     window.Telegram.WebApp.requestFullscreen();
@@ -67,7 +69,8 @@ export default function RootLayout({
         >
           <TelegramProvider>
             <TelegramSafeArea />
-            <div className="pb-[calc(var(--tg-safe-bottom,0px)+var(--tg-content-padding,0px))]">
+            <TelegramNavigation />
+            <div className="pt-[var(--tg-nav-height,0px)] pb-[calc(var(--tg-safe-bottom,0px)+var(--tg-content-padding,0px))] mt-[var(--tg-content-padding,16px)]">
               {children}
             </div>
           </TelegramProvider>
