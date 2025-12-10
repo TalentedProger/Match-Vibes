@@ -35,12 +35,17 @@ export function AchievementCard({
         isUnlocked ? 'bg-card shadow-lg' : 'bg-card/50'
       }`}
       style={{
-        border: isUnlocked
-          ? '1px solid hsl(var(--border))'
-          : '1px solid hsl(var(--border) / 0.5)',
-        boxShadow: isUnlocked
-          ? `0 0 0 1px ${rarity === 'legendary' ? 'rgba(245, 158, 11, 0.3)' : rarity === 'epic' ? 'rgba(168, 85, 247, 0.3)' : rarity === 'rare' ? 'rgba(59, 130, 246, 0.3)' : 'rgba(107, 114, 128, 0.2)'}`
-          : 'none',
+        border: `${isUnlocked ? '0.5px' : '0.5px'} solid ${
+          isUnlocked
+            ? rarity === 'legendary'
+              ? 'rgba(245, 158, 11, 0.5)'
+              : rarity === 'epic'
+                ? 'rgba(168, 85, 247, 0.5)'
+                : rarity === 'rare'
+                  ? 'rgba(59, 130, 246, 0.5)'
+                  : 'hsl(var(--border))'
+            : 'hsl(var(--border) / 0.3)'
+        }`,
       }}
     >
       <div className="p-4">
