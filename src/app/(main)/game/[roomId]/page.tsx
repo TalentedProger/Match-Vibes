@@ -254,7 +254,7 @@ export default function GamePage() {
       <div
         className="h-[100dvh] flex flex-col bg-background fixed inset-0 overflow-hidden"
         style={{
-          paddingTop: 'var(--tg-safe-top, 0px)',
+          paddingTop: 'calc(var(--tg-nav-height, 56px) + 8px)',
           paddingBottom: 'var(--tg-safe-bottom, 0px)',
         }}
       >

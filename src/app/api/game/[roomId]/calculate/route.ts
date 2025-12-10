@@ -174,24 +174,48 @@ export async function POST(
       questions: questions as Question[],
     })
 
-    // 6. Store result in database
+    // 6. Store result in database (use upsert to prevent duplicate key errors)
     const { data: savedResult, error: saveError } = await supabase
       .from('results')
-      .insert({
-        room_id: roomId,
-        host_id: room.host_id,
-        guest_id: room.guest_id,
-        category_id: room.category_id,
-        match_percentage: matchResult.matchPercentage,
-        host_favorite: matchResult.hostFavorite,
-        guest_favorite: matchResult.guestFavorite,
-        shared_item: matchResult.sharedItem,
-      })
+      .upsert(
+        {
+          room_id: roomId,
+          host_id: room.host_id,
+          guest_id: room.guest_id,
+          category_id: room.category_id,
+          match_percentage: matchResult.matchPercentage,
+          host_favorite: matchResult.hostFavorite,
+          guest_favorite: matchResult.guestFavorite,
+          shared_item: matchResult.sharedItem,
+        },
+        {
+          onConflict: 'room_id',
+          ignoreDuplicates: false,
+        }
+      )
       .select()
       .single()
 
     if (saveError) {
       console.error('Failed to save result:', saveError)
+
+      // If still duplicate error, try to fetch existing result
+      if (saveError.code === '23505') {
+        const { data: existingResult } = await supabase
+          .from('results')
+          .select('*')
+          .eq('room_id', roomId)
+          .single()
+
+        if (existingResult) {
+          return NextResponse.json({
+            message: 'Result already calculated',
+            result: existingResult,
+            cached: true,
+          })
+        }
+      }
+
       return NextResponse.json(
         { error: 'Failed to save result' },
         { status: 500 }
