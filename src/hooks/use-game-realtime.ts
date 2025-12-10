@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { RealtimeChannel } from '@supabase/supabase-js'
 
@@ -8,7 +8,17 @@ interface GameRealtimeState {
   partnerProgress: number
   roomStatus: string
   isPartnerActive: boolean
+  isPartnerCompleted: boolean
   lastUpdated: Date
+}
+
+// Debounce utility
+function debounce<T extends (...args: any[]) => void>(fn: T, delay: number): T {
+  let timeoutId: NodeJS.Timeout | null = null
+  return ((...args: any[]) => {
+    if (timeoutId) clearTimeout(timeoutId)
+    timeoutId = setTimeout(() => fn(...args), delay)
+  }) as T
 }
 
 export function useGameRealtime(roomId: string, userId: string) {
@@ -16,43 +26,119 @@ export function useGameRealtime(roomId: string, userId: string) {
     partnerProgress: 0,
     roomStatus: 'playing',
     isPartnerActive: false,
+    isPartnerCompleted: false,
     lastUpdated: new Date(),
   })
-  const [partnerId, setPartnerId] = useState<string | null>(null)
+
+  const partnerIdRef = useRef<string | null>(null)
+  const totalQuestionsRef = useRef<number>(0)
+  const channelRef = useRef<RealtimeChannel | null>(null)
+  const lastProgressRef = useRef<number>(0)
+  const isMountedRef = useRef(true)
+
+  // Stable state updater with deduplication
+  const updateProgress = useCallback((newProgress: number, isActive = true) => {
+    if (!isMountedRef.current) return
+    if (newProgress === lastProgressRef.current) return // Skip if same
+
+    lastProgressRef.current = newProgress
+    const isCompleted =
+      totalQuestionsRef.current > 0 && newProgress >= totalQuestionsRef.current
+
+    setState(prev => ({
+      ...prev,
+      partnerProgress: newProgress,
+      isPartnerActive: isActive,
+      isPartnerCompleted: isCompleted,
+      lastUpdated: new Date(),
+    }))
+  }, [])
+
+  // Debounced progress update to prevent rapid re-renders
+  const debouncedUpdateProgress = useCallback(
+    debounce((progress: number) => updateProgress(progress, true), 300),
+    [updateProgress]
+  )
 
   useEffect(() => {
     if (!roomId || !userId) return
 
+    isMountedRef.current = true
     const supabase = createClient()
-    let channel: RealtimeChannel
 
     const setupRealtime = async () => {
-      // Get room info to determine partner
+      // Get room info to determine partner and question count
       const { data: room } = await supabase
         .from('rooms')
-        .select('host_id, guest_id, status')
+        .select('host_id, guest_id, status, category_id, subcategory_id')
         .eq('id', roomId)
         .single()
 
-      if (!room) return
+      if (!room || !isMountedRef.current) return
 
-      const currentPartnerId =
-        room.host_id === userId ? room.guest_id : room.host_id
-      setPartnerId(currentPartnerId)
+      const partnerId = room.host_id === userId ? room.guest_id : room.host_id
+      partnerIdRef.current = partnerId
 
-      // Subscribe to room changes
-      channel = supabase
-        .channel(`game:${roomId}`)
+      // Get total questions count
+      let questionsQuery
+      if (room.subcategory_id) {
+        questionsQuery = supabase
+          .from('questions')
+          .select('id', { count: 'exact', head: true })
+          .eq('subcategory_id', room.subcategory_id)
+          .eq('is_active', true)
+      } else {
+        const { data: subcategories } = await supabase
+          .from('subcategories')
+          .select('id')
+          .eq('category_id', room.category_id)
+        const subcategoryIds = subcategories?.map(s => s.id) || []
+        questionsQuery = supabase
+          .from('questions')
+          .select('id', { count: 'exact', head: true })
+          .in('subcategory_id', subcategoryIds)
+          .eq('is_active', true)
+      }
+
+      const { count } = await questionsQuery
+      totalQuestionsRef.current = count || 0
+
+      // Get initial partner progress
+      if (partnerId) {
+        const { data: responses } = await supabase
+          .from('responses')
+          .select('id')
+          .eq('room_id', roomId)
+          .eq('user_id', partnerId)
+
+        const initialProgress = responses?.length || 0
+        lastProgressRef.current = initialProgress
+
+        if (isMountedRef.current) {
+          setState(prev => ({
+            ...prev,
+            partnerProgress: initialProgress,
+            roomStatus: room.status,
+            isPartnerCompleted:
+              totalQuestionsRef.current > 0 &&
+              initialProgress >= totalQuestionsRef.current,
+          }))
+        }
+      }
+
+      // Subscribe to room changes only for status
+      channelRef.current = supabase
+        .channel(`game-optimized:${roomId}`)
         .on(
           'postgres_changes',
           {
-            event: '*',
+            event: 'UPDATE',
             schema: 'public',
             table: 'rooms',
             filter: `id=eq.${roomId}`,
           },
           payload => {
-            console.log('Room updated:', payload)
+            if (!isMountedRef.current) return
             if (
               payload.new &&
               typeof payload.new === 'object' &&
@@ -73,92 +159,53 @@ export function useGameRealtime(roomId: string, userId: string) {
             table: 'responses',
             filter: `room_id=eq.${roomId}`,
           },
-          async payload => {
-            console.log('New response:', payload)
-            // Count partner's responses
-            const { data: responses } = await supabase
-              .from('responses')
-              .select('id')
-              .eq('room_id', roomId)
-              .eq('user_id', partnerId)
-
-            setState(prev => ({
-              ...prev,
-              partnerProgress: responses?.length || 0,
-              isPartnerActive: true,
-              lastUpdated: new Date(),
-            }))
-          }
-        )
-        .on('presence', { event: 'sync' }, () => {
-          const presenceState = channel.presenceState()
-          const isActive = Object.keys(presenceState).some(key =>
-            presenceState[key]?.some((p: any) => p.user_id === partnerId)
-          )
-          setState(prev => ({
-            ...prev,
-            isPartnerActive: isActive,
-            lastUpdated: new Date(),
-          }))
-        })
-        .subscribe(async status => {
-          if (status === 'SUBSCRIBED') {
-            // Track user presence
-            await channel.track({
-              user_id: userId,
-              online_at: new Date().toISOString(),
-            })
-
-            // Get initial partner progress
-            if (currentPartnerId) {
-              const { data: responses } = await supabase
-                .from('responses')
-                .select('id')
-                .eq('room_id', roomId)
-                .eq('user_id', currentPartnerId)
-
-              setState(prev => ({
-                ...prev,
-                partnerProgress: responses?.length || 0,
-                lastUpdated: new Date(),
-              }))
+          payload => {
+            if (!isMountedRef.current) return
+            // Only update if it's partner's response
+            if (
+              payload.new &&
+              typeof payload.new === 'object' &&
+              'user_id' in payload.new
+            ) {
+              if (payload.new.user_id === partnerIdRef.current) {
+                // Increment progress instead of re-fetching
+                const newProgress = lastProgressRef.current + 1
+                debouncedUpdateProgress(newProgress)
+              }
             }
           }
-        })
+        )
+        .subscribe()
     }
 
     setupRealtime()
 
-    // Periodic refresh of partner progress (fallback for missed realtime updates)
+    // Slower polling fallback - every 5 seconds instead of 3
     const intervalId = setInterval(async () => {
-      if (partnerId) {
-        const { data: responses } = await supabase
-          .from('responses')
-          .select('id')
-          .eq('room_id', roomId)
-          .eq('user_id', partnerId)
+      if (!isMountedRef.current || !partnerIdRef.current) return
 
-        const currentProgress = responses?.length || 0
-        setState(prev => {
-          if (prev.partnerProgress !== currentProgress) {
-            return {
-              ...prev,
-              partnerProgress: currentProgress,
-              lastUpdated: new Date(),
-            }
-          }
-          return prev
-        })
+      const { data: responses } = await supabase
+        .from('responses')
+        .select('id')
+        .eq('room_id', roomId)
+        .eq('user_id', partnerIdRef.current)
+
+      const currentProgress = responses?.length || 0
+
+      // Only update if different from last known value
+      if (currentProgress !== lastProgressRef.current) {
+        updateProgress(currentProgress, true)
       }
-    }, 3000) // Check every 3 seconds
+    }, 5000)
 
     return () => {
-      if (channel) {
-        supabase.removeChannel(channel)
+      isMountedRef.current = false
+      if (channelRef.current) {
+        supabase.removeChannel(channelRef.current)
       }
       clearInterval(intervalId)
     }
-  }, [roomId, userId, partnerId])
+  }, [roomId, userId, updateProgress, debouncedUpdateProgress])
 
   return state
 }

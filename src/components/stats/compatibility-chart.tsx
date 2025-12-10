@@ -28,11 +28,10 @@ export function CompatibilityChart({
         <h3 className="text-lg font-semibold text-foreground">
           Распределение совместимости
         </h3>
-        <div className="text-right">
+        <div className="flex items-center justify-center">
           <span className="text-2xl font-bold text-primary">
             {avgCompatibility}%
           </span>
-          <p className="text-xs text-muted-foreground">в среднем</p>
         </div>
       </div>
 

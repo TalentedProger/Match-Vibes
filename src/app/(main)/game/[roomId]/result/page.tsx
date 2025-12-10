@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { GameResultDisplay } from '@/components/game/game-result'
 import { useMatchResult } from '@/hooks/use-match-result'
 import { Button } from '@/components/ui/button'
-import { Loader2, AlertCircle } from 'lucide-react'
+import { Loader2, AlertCircle, Sparkles } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useAuth } from '@/hooks/use-auth'
 import { useGameRealtime } from '@/hooks/use-game-realtime'
@@ -16,6 +16,7 @@ type PageState =
   | 'loading' // Initial loading
   | 'waiting' // Waiting for partner to finish
   | 'calculating' // Both ready, calculating results
+  | 'transitioning' // Smooth transition to results
   | 'result' // Showing results
   | 'error' // Error state
 
@@ -148,7 +149,7 @@ export default function ResultPage() {
       }
     }, [roomId])
 
-  // Calculate match results
+  // Calculate match results with smooth transition
   const performCalculation = useCallback(async () => {
     if (calculationAttemptedRef.current) return
     calculationAttemptedRef.current = true
@@ -157,7 +158,13 @@ export default function ResultPage() {
 
     try {
       await calculateMatch()
-      if (isMountedRef.current) setPageState('result')
+      if (isMountedRef.current) {
+        // Smooth transition to results
+        setPageState('transitioning')
+        setTimeout(() => {
+          if (isMountedRef.current) setPageState('result')
+        }, 600)
+      }
     } catch (err) {
       console.error('Calculation error:', err)
       if (isMountedRef.current) {
@@ -202,7 +209,13 @@ export default function ResultPage() {
       // If result already exists, fetch it
       if (data.resultExists) {
         await fetchResult()
-        if (isMountedRef.current) setPageState('result')
+        if (isMountedRef.current) {
+          // Smooth transition to results
+          setPageState('transitioning')
+          setTimeout(() => {
+            if (isMountedRef.current) setPageState('result')
+          }, 600)
+        }
         return
       }
 
@@ -218,7 +231,7 @@ export default function ResultPage() {
 
     initCheck()
 
-    // Start polling for readiness - check every 1.5s for faster response
+    // Start polling for readiness - check every 2.5s (was 1.5s) for less load
     pollIntervalRef.current = setInterval(async () => {
       if (!isMountedRef.current) return
       if (calculationAttemptedRef.current) return
@@ -226,20 +239,25 @@ export default function ResultPage() {
       const data = await checkReadiness()
       if (!data || !isMountedRef.current) return
 
-      // If result exists, fetch it immediately
+      // If result exists, fetch it with smooth transition
       if (data.resultExists) {
         stopPolling()
         await fetchResult()
-        if (isMountedRef.current) setPageState('result')
+        if (isMountedRef.current) {
+          setPageState('transitioning')
+          setTimeout(() => {
+            if (isMountedRef.current) setPageState('result')
+          }, 600)
+        }
         return
       }
 
-      // If both ready, calculate immediately
+      // If both ready, calculate with transition
       if (data.ready && !calculationAttemptedRef.current) {
         stopPolling()
         await performCalculation()
       }
-    }, 1500)
+    }, 2500)
 
     return () => {
       stopPolling()
@@ -322,6 +340,21 @@ export default function ResultPage() {
         <p className="text-lg font-medium">Подсчитываем совместимость...</p>
         <p className="text-sm text-muted-foreground mt-2">
           Анализируем ваши ответы
+        </p>
+      </div>
+    )
+  }
+
+  // Transitioning state - smooth fade to results
+  if (pageState === 'transitioning') {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen p-4 animate-pulse">
+        <div className="w-20 h-20 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center mb-4">
+          <Sparkles className="w-10 h-10 text-white" />
+        </div>
+        <p className="text-lg font-medium">Готово!</p>
+        <p className="text-sm text-muted-foreground mt-2">
+          Показываем результаты...
         </p>
       </div>
     )

@@ -15,36 +15,42 @@ export default function ProfilePage() {
   const [isEditing, setIsEditing] = useState(false)
   const [shareSuccess, setShareSuccess] = useState(false)
 
-  const handleShare = useCallback(() => {
-    const webApp = (window as any).Telegram?.WebApp
-    if (!webApp || !user) return
+  const handleShare = useCallback(async () => {
+    if (!user) return
 
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://your-app-url.com'
-    const shareUrl = `${appUrl}/profile/${user.id}`
+    const webApp = (window as any).Telegram?.WebApp
+    const botUsername = process.env.NEXT_PUBLIC_BOT_USERNAME || 'MatchVibeBot'
 
     const shareText =
-      `🎮 Смотри мой профиль в MatchVibe!\n\n` +
-      `${user.firstName || user.username} уже сыграл ${stats?.gamesPlayed || 0} игр!\n` +
+      `🎮 Привет! Смотри мой профиль в MatchVibe!\n\n` +
+      `${user.firstName || user.username || 'Я'} уже сыграл ${stats?.gamesPlayed || 0} игр!\n` +
       `💫 Средняя совместимость: ${stats?.avgCompatibility || 0}%\n\n` +
       `Присоединяйся и найди свой общий вайб с друзьями!`
 
-    // Используем Telegram share
-    if (typeof webApp.switchInlineQuery === 'function') {
-      webApp.switchInlineQuery(shareText, ['users', 'groups', 'channels'])
-    } else {
-      // Fallback - копируем в буфер обмена
-      navigator.clipboard
-        .writeText(`${shareText}\n\n${shareUrl}`)
-        .then(() => {
-          setShareSuccess(true)
-          setTimeout(() => setShareSuccess(false), 2000)
-        })
-        .catch(() => {
-          // Ещё один fallback - открываем Telegram share
-          webApp.openTelegramLink(
-            `https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(shareText)}`
-          )
-        })
+    const shareUrl = `https://t.me/${botUsername}?start=profile_${user.id}`
+
+    // Попробуем разные методы шаринга
+    try {
+      // Метод 1: Используем Telegram openTelegramLink для шаринга
+      if (webApp?.openTelegramLink) {
+        const telegramShareUrl = `https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(shareText)}`
+        webApp.openTelegramLink(telegramShareUrl)
+        setShareSuccess(true)
+        setTimeout(() => setShareSuccess(false), 2000)
+        return
+      }
+
+      // Метод 2: Копируем в буфер обмена
+      await navigator.clipboard.writeText(`${shareText}\n\n${shareUrl}`)
+      setShareSuccess(true)
+      setTimeout(() => setShareSuccess(false), 2000)
+    } catch (error) {
+      console.error('Share failed:', error)
+      // Метод 3: Открываем ссылку напрямую
+      window.open(
+        `https://t.me/share/url?url=${encodeURIComponent(shareUrl)}&text=${encodeURIComponent(shareText)}`,
+        '_blank'
+      )
     }
   }, [user, stats])
 

@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useCallback } from 'react'
+import { useCategoriesStore } from '@/stores/categories-store'
 import type { Database } from '@/types/database'
 
 type Category = Database['public']['Tables']['categories']['Row']
@@ -11,40 +12,22 @@ interface UseCategoriesResult {
 }
 
 export function useCategories(): UseCategoriesResult {
-  const [categories, setCategories] = useState<Category[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-
-  const fetchCategories = async () => {
-    try {
-      setIsLoading(true)
-      setError(null)
-
-      const response = await fetch('/api/categories')
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch categories')
-      }
-
-      const data = await response.json()
-      setCategories(data.categories || [])
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Unknown error'
-      setError(message)
-      console.error('Error fetching categories:', err)
-    } finally {
-      setIsLoading(false)
-    }
-  }
+  const { categories, isLoading, error, fetchCategories, invalidateCache } =
+    useCategoriesStore()
 
   useEffect(() => {
     fetchCategories()
-  }, [])
+  }, [fetchCategories])
+
+  const refetch = useCallback(async () => {
+    invalidateCache()
+    await fetchCategories(true)
+  }, [fetchCategories, invalidateCache])
 
   return {
     categories,
     isLoading,
     error,
-    refetch: fetchCategories,
+    refetch,
   }
 }
