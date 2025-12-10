@@ -82,7 +82,7 @@ export function GameResultDisplay({
   }
 
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen p-4 bg-gradient-to-b from-background to-muted">
+    <div className="h-[100dvh] flex flex-col items-center justify-center p-4 bg-gradient-to-b from-background to-muted overflow-hidden">
       {showConfetti && <ConfettiEffect />}
 
       <motion.div

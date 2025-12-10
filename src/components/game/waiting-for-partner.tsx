@@ -27,7 +27,7 @@ export const WaitingForPartnerScreen = memo(function WaitingForPartnerScreen({
 
   return (
     <div
-      className={`min-h-screen flex flex-col items-center justify-center p-6 bg-gradient-to-br from-background via-background to-primary/5 ${className}`}
+      className={`h-[100dvh] flex flex-col items-center justify-center p-6 bg-gradient-to-br from-background via-background to-primary/5 overflow-hidden ${className}`}
     >
       <div className="text-center max-w-md w-full waiting-fade-in">
         {/* Main Icon with CSS Animation */}

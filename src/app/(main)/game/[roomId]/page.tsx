@@ -258,8 +258,21 @@ export default function GamePage() {
           paddingBottom: 'var(--tg-safe-bottom, 0px)',
         }}
       >
-        {/* Header - Question Counter and Timer */}
-        <div className="flex-shrink-0 w-full max-w-md mx-auto px-4 py-3 flex items-center justify-between">
+        {/* Partner Progress (at top with spacing from Telegram header) */}
+        {currentRoom?.guest_id && (
+          <div className="flex-shrink-0 px-4 pt-4 pb-2">
+            <div className="max-w-md mx-auto">
+              <PartnerProgress
+                progress={partnerProgress}
+                total={questions.length}
+                isActive={isPartnerActive}
+              />
+            </div>
+          </div>
+        )}
+
+        {/* Header - Question Counter and Timer (below partner progress) */}
+        <div className="flex-shrink-0 w-full max-w-md mx-auto px-4 py-2 flex items-center justify-between">
           <div className="flex items-center gap-1.5">
             <MessageCircleQuestion className="w-4 h-4 text-primary" />
             <span className="text-sm font-semibold text-foreground">
@@ -274,19 +287,6 @@ export default function GamePage() {
             </span>
           </div>
         </div>
-
-        {/* Partner Progress (below header) */}
-        {currentRoom?.guest_id && (
-          <div className="flex-shrink-0 px-4 pb-2">
-            <div className="max-w-md mx-auto">
-              <PartnerProgress
-                progress={partnerProgress}
-                total={questions.length}
-                isActive={isPartnerActive}
-              />
-            </div>
-          </div>
-        )}
 
         {/* Main Game Area - Card centered */}
         <div className="flex-1 flex items-center justify-center px-4 py-4 min-h-0">

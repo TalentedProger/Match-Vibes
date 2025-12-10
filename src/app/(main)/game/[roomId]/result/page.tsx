@@ -149,7 +149,7 @@ export default function ResultPage() {
       }
     }, [roomId])
 
-  // Calculate match results with smooth transition
+  // Calculate match results - directly to result state
   const performCalculation = useCallback(async () => {
     if (calculationAttemptedRef.current) return
     calculationAttemptedRef.current = true
@@ -159,11 +159,7 @@ export default function ResultPage() {
     try {
       await calculateMatch()
       if (isMountedRef.current) {
-        // Smooth transition to results
-        setPageState('transitioning')
-        setTimeout(() => {
-          if (isMountedRef.current) setPageState('result')
-        }, 600)
+        setPageState('result')
       }
     } catch (err) {
       console.error('Calculation error:', err)
@@ -210,11 +206,7 @@ export default function ResultPage() {
       if (data.resultExists) {
         await fetchResult()
         if (isMountedRef.current) {
-          // Smooth transition to results
-          setPageState('transitioning')
-          setTimeout(() => {
-            if (isMountedRef.current) setPageState('result')
-          }, 600)
+          setPageState('result')
         }
         return
       }
@@ -239,15 +231,12 @@ export default function ResultPage() {
       const data = await checkReadiness()
       if (!data || !isMountedRef.current) return
 
-      // If result exists, fetch it with smooth transition
+      // If result exists, fetch it and show directly
       if (data.resultExists) {
         stopPolling()
         await fetchResult()
         if (isMountedRef.current) {
-          setPageState('transitioning')
-          setTimeout(() => {
-            if (isMountedRef.current) setPageState('result')
-          }, 600)
+          setPageState('result')
         }
         return
       }
@@ -337,10 +326,10 @@ export default function ResultPage() {
     )
   }
 
-  // Calculating state
-  if (pageState === 'calculating') {
+  // Calculating state - brief loading before results
+  if (pageState === 'calculating' || pageState === 'transitioning') {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen p-4">
+      <div className="h-[100dvh] flex flex-col items-center justify-center p-4 overflow-hidden">
         <Loader2 className="w-12 h-12 animate-spin text-primary mb-4" />
         <p className="text-lg font-medium">Подсчитываем совместимость...</p>
         <p className="text-sm text-muted-foreground mt-2">
@@ -350,25 +339,10 @@ export default function ResultPage() {
     )
   }
 
-  // Transitioning state - smooth fade to results
-  if (pageState === 'transitioning') {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen p-4 animate-pulse">
-        <div className="w-20 h-20 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center mb-4">
-          <Sparkles className="w-10 h-10 text-white" />
-        </div>
-        <p className="text-lg font-medium">Готово!</p>
-        <p className="text-sm text-muted-foreground mt-2">
-          Показываем результаты...
-        </p>
-      </div>
-    )
-  }
-
   // Error state
   if (pageState === 'error' && errorMessage) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen p-4">
+      <div className="h-[100dvh] flex flex-col items-center justify-center p-4 overflow-hidden">
         <AlertCircle className="w-16 h-16 text-destructive mb-4" />
         <h2 className="text-2xl font-bold mb-2">Ошибка</h2>
         <p className="text-muted-foreground text-center mb-6 max-w-md">
@@ -399,7 +373,7 @@ export default function ResultPage() {
 
   // Fallback
   return (
-    <div className="flex flex-col items-center justify-center min-h-screen p-4">
+    <div className="h-[100dvh] flex flex-col items-center justify-center p-4 overflow-hidden">
       <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
       <p className="text-muted-foreground mt-4">Загрузка...</p>
     </div>
