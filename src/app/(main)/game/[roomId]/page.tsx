@@ -253,12 +253,32 @@ export default function GamePage() {
     <AuthGuard>
       <div
         className="h-[100dvh] flex flex-col bg-background fixed inset-0 overflow-hidden"
-        style={{ paddingBottom: 'var(--tg-safe-bottom, 0px)' }}
+        style={{
+          paddingTop: 'var(--tg-safe-top, 0px)',
+          paddingBottom: 'var(--tg-safe-bottom, 0px)',
+        }}
       >
-        {/* Partner Progress (sticky at top) */}
+        {/* Header - Question Counter and Timer */}
+        <div className="flex-shrink-0 w-full max-w-md mx-auto px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-1.5">
+            <MessageCircleQuestion className="w-4 h-4 text-primary" />
+            <span className="text-sm font-semibold text-foreground">
+              <span className="text-primary">{currentQuestionIndex + 1}</span>/
+              {questions.length}
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <Clock className="w-4 h-4 text-primary" />
+            <span className="text-sm font-semibold text-foreground">
+              <span className="text-primary font-bold">{timeRemaining}с</span>
+            </span>
+          </div>
+        </div>
+
+        {/* Partner Progress (below header) */}
         {currentRoom?.guest_id && (
-          <div className="flex-shrink-0 bg-background/80 backdrop-blur-lg border-b border-border">
-            <div className="container max-w-2xl mx-auto px-3 py-1.5">
+          <div className="flex-shrink-0 px-4 pb-2">
+            <div className="max-w-md mx-auto">
               <PartnerProgress
                 progress={partnerProgress}
                 total={questions.length}
@@ -268,57 +288,35 @@ export default function GamePage() {
           </div>
         )}
 
-        {/* Main Game Area - fixed height container */}
-        <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-          {/* Question Counter and Timer Header */}
-          <div className="flex-shrink-0 w-full max-w-sm mx-auto py-2 px-4 flex items-center justify-between">
-            <div className="flex items-center gap-1.5">
-              <MessageCircleQuestion className="w-4 h-4 text-primary" />
-              <span className="text-sm font-semibold text-foreground">
-                <span className="text-primary">{currentQuestionIndex + 1}</span>
-                /{questions.length}
-              </span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <Clock className="w-4 h-4 text-primary" />
-              <span className="text-sm font-semibold text-foreground">
-                <span className="text-primary font-bold">{timeRemaining}с</span>
-              </span>
-            </div>
-          </div>
-
-          {/* Card Container - takes 80% of remaining space with equal padding */}
-          <div className="flex-1 flex items-center justify-center px-4 py-3">
-            <AnimatePresence mode="wait">
-              {currentQuestion ? (
-                <motion.div
-                  key={currentQuestion.id}
-                  initial={{ opacity: 0, scale: 0.95 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.95 }}
-                  transition={{
-                    type: 'spring',
-                    stiffness: 300,
-                    damping: 25,
-                    duration: 0.2,
-                  }}
-                  className="w-full h-[80%] max-w-[340px] flex items-center"
-                >
-                  <GameCard
-                    question={currentQuestion}
-                    onSwipe={handleSwipe}
-                    disabled={isCompleted}
-                  />
-                </motion.div>
-              ) : (
-                <div className="text-center">
-                  <p className="text-muted-foreground">
-                    Нет доступных вопросов
-                  </p>
-                </div>
-              )}
-            </AnimatePresence>
-          </div>
+        {/* Main Game Area - Card centered */}
+        <div className="flex-1 flex items-center justify-center px-4 py-4 min-h-0">
+          <AnimatePresence mode="wait">
+            {currentQuestion ? (
+              <motion.div
+                key={currentQuestion.id}
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                transition={{
+                  type: 'spring',
+                  stiffness: 300,
+                  damping: 25,
+                  duration: 0.2,
+                }}
+                className="w-full max-w-[360px]"
+              >
+                <GameCard
+                  question={currentQuestion}
+                  onSwipe={handleSwipe}
+                  disabled={isCompleted}
+                />
+              </motion.div>
+            ) : (
+              <div className="text-center">
+                <p className="text-muted-foreground">Нет доступных вопросов</p>
+              </div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
     </AuthGuard>

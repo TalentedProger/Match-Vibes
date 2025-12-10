@@ -49,7 +49,7 @@ export const GameCard = memo(function GameCard({
 
   return (
     <motion.div
-      className="relative w-full h-full max-w-[340px] mx-auto touch-none"
+      className="relative w-full max-w-[360px] mx-auto touch-none"
       style={{
         x,
         rotate,
@@ -67,8 +67,8 @@ export const GameCard = memo(function GameCard({
       onDragEnd={handleDragEnd}
       whileTap={{ cursor: 'grabbing' }}
     >
-      {/* Card - fill available height */}
-      <div className="relative w-full h-full bg-card rounded-2xl shadow-xl overflow-hidden border border-border">
+      {/* Card - with aspect ratio 3:4 */}
+      <div className="relative w-full aspect-[3/4.2] bg-card rounded-2xl shadow-xl overflow-hidden border border-border">
         {/* Image - Full Height */}
         <div className="absolute inset-0 bg-gradient-to-br from-primary/10 to-secondary/10">
           {question.image_url ? (

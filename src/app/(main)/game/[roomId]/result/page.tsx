@@ -322,13 +322,18 @@ export default function ResultPage() {
 
   // ========== RENDER BASED ON STATE ==========
 
-  // Loading state
-  if (pageState === 'loading' || isResultLoading) {
+  // Show waiting screen as the primary state during initial load and waiting
+  // This prevents flickering between loading and waiting states
+  if (pageState === 'loading' || pageState === 'waiting') {
+    const currentProgress = getPartnerProgressForDisplay()
+    const currentTotal = readiness?.progress.total || totalQuestions
+
     return (
-      <div className="flex flex-col items-center justify-center min-h-screen p-4">
-        <Loader2 className="w-12 h-12 animate-spin text-primary mb-4" />
-        <p className="text-lg font-medium">Загружаем результаты...</p>
-      </div>
+      <WaitingForPartnerScreen
+        partnerProgress={currentProgress}
+        totalQuestions={currentTotal}
+        isPartnerActive={isPartnerActive}
+      />
     )
   }
 
@@ -357,20 +362,6 @@ export default function ResultPage() {
           Показываем результаты...
         </p>
       </div>
-    )
-  }
-
-  // Waiting for partner state
-  if (pageState === 'waiting') {
-    const currentProgress = getPartnerProgressForDisplay()
-    const currentTotal = readiness?.progress.total || totalQuestions
-
-    return (
-      <WaitingForPartnerScreen
-        partnerProgress={currentProgress}
-        totalQuestions={currentTotal}
-        isPartnerActive={isPartnerActive}
-      />
     )
   }
 
