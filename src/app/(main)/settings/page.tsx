@@ -3,6 +3,7 @@
 import { useState } from 'react'
 import { AuthGuard } from '@/components/auth/auth-guard'
 import { useAuth } from '@/hooks/use-auth'
+import { useSettingsStore } from '@/stores/settings-store'
 import {
   ArrowLeft,
   Bell,
@@ -14,16 +15,21 @@ import {
   Info,
   ExternalLink,
   ChevronRight,
+  Music,
+  Volume2,
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useTheme } from 'next-themes'
 import { motion } from 'framer-motion'
+import Image from 'next/image'
 
 export default function SettingsPage() {
   const router = useRouter()
   const { user } = useAuth()
   const { theme, setTheme } = useTheme()
   const [notifications, setNotifications] = useState(true)
+  const { musicEnabled, toggleMusic, musicVolume, setMusicVolume } =
+    useSettingsStore()
 
   const handleToggleNotifications = () => {
     setNotifications(!notifications)
@@ -35,7 +41,11 @@ export default function SettingsPage() {
   }
 
   const handleOpenTelegramSupport = () => {
-    const webApp = (window as any).Telegram?.WebApp
+    const webApp = (
+      window as unknown as {
+        Telegram?: { WebApp?: { openTelegramLink: (url: string) => void } }
+      }
+    ).Telegram?.WebApp
     if (webApp) {
       webApp.openTelegramLink('https://t.me/MatchVibeSupport')
     }
@@ -71,9 +81,11 @@ export default function SettingsPage() {
               <div className="p-4 flex items-center gap-4">
                 <div className="w-12 h-12 rounded-full bg-gradient-to-br from-primary to-secondary flex items-center justify-center text-white font-bold text-lg overflow-hidden">
                   {user?.avatarUrl ? (
-                    <img
+                    <Image
                       src={user.avatarUrl}
                       alt=""
+                      width={48}
+                      height={48}
                       className="w-full h-full object-cover"
                     />
                   ) : (
@@ -155,11 +167,77 @@ export default function SettingsPage() {
             </div>
           </motion.section>
 
-          {/* Notifications Section */}
+          {/* Music Section */}
           <motion.section
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
+            className="space-y-3"
+          >
+            <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide px-1">
+              Музыка
+            </h2>
+            <div className="bg-card rounded-2xl overflow-hidden divide-y divide-border">
+              <button
+                onClick={toggleMusic}
+                className="w-full p-4 flex items-center gap-3"
+              >
+                <div className="w-10 h-10 bg-pink-500/10 rounded-full flex items-center justify-center">
+                  <Music className="w-5 h-5 text-pink-500" />
+                </div>
+                <div className="flex-1 text-left">
+                  <p className="font-medium text-foreground">Фоновая музыка</p>
+                  <p className="text-sm text-muted-foreground">
+                    Новогодняя мелодия на главном экране
+                  </p>
+                </div>
+                <div
+                  className={`w-12 h-7 rounded-full transition-colors relative ${
+                    musicEnabled ? 'bg-primary' : 'bg-muted'
+                  }`}
+                >
+                  <div
+                    className={`absolute top-1 w-5 h-5 rounded-full bg-white shadow-sm transition-transform ${
+                      musicEnabled ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </div>
+              </button>
+
+              {/* Volume slider */}
+              {musicEnabled && (
+                <div className="p-4 flex items-center gap-3">
+                  <div className="w-10 h-10 bg-pink-500/10 rounded-full flex items-center justify-center">
+                    <Volume2 className="w-5 h-5 text-pink-500" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="font-medium text-foreground text-sm mb-2">
+                      Громкость
+                    </p>
+                    <input
+                      type="range"
+                      min="0"
+                      max="100"
+                      value={musicVolume * 100}
+                      onChange={e =>
+                        setMusicVolume(Number(e.target.value) / 100)
+                      }
+                      className="w-full h-2 bg-muted rounded-full appearance-none cursor-pointer accent-primary"
+                    />
+                  </div>
+                  <span className="text-sm text-muted-foreground w-10 text-right">
+                    {Math.round(musicVolume * 100)}%
+                  </span>
+                </div>
+              )}
+            </div>
+          </motion.section>
+
+          {/* Notifications Section */}
+          <motion.section
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.3 }}
             className="space-y-3"
           >
             <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide px-1">
@@ -200,7 +278,7 @@ export default function SettingsPage() {
           <motion.section
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
+            transition={{ delay: 0.4 }}
             className="space-y-3"
           >
             <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide px-1">

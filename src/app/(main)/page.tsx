@@ -2,6 +2,7 @@
 
 import { useAuth } from '@/hooks/use-auth'
 import { useGameHistory } from '@/hooks/use-game-history'
+import { useBackgroundMusic } from '@/hooks/use-background-music'
 import { useRouter } from 'next/navigation'
 import {
   Sparkles,
@@ -10,11 +11,21 @@ import {
   AlertCircle,
   BarChart3,
   Clock,
+  Volume2,
+  VolumeX,
 } from 'lucide-react'
 import { GameHistoryCarousel } from '@/components/history'
+import { Snowfall } from '@/components/effects'
+import { useSettingsStore } from '@/stores/settings-store'
 import Link from 'next/link'
 
 export default function Home() {
+  // Background music
+  const { isPlaying, toggle: togglePlayback } = useBackgroundMusic({
+    src: '/audio/main_melody.mp3',
+    autoPlay: true,
+  })
+  const { musicEnabled, toggleMusic } = useSettingsStore()
   const { user, isAuthenticated, isLoading, isTelegramEnv } = useAuth()
   const { history, isLoading: isLoadingHistory } = useGameHistory(
     user?.id || null
@@ -36,8 +47,37 @@ export default function Home() {
       : 'Погнали! 🚀'
 
   return (
-    <main className="min-h-[calc(100dvh-80px)] flex flex-col items-center justify-center p-4 sm:p-6">
-      <div className="flex flex-col space-y-6 max-w-md w-full mx-auto">
+    <main className="min-h-[calc(100dvh-80px)] flex flex-col items-center justify-center p-4 sm:p-6 relative">
+      {/* Snowfall Effect */}
+      <Snowfall
+        count={60}
+        minSize={2}
+        maxSize={6}
+        minSpeed={0.5}
+        maxSpeed={1.5}
+        wind={0.3}
+      />
+
+      {/* Music Control Button - Fixed position */}
+      <button
+        type="button"
+        onClick={() => {
+          toggleMusic()
+          if (!isPlaying && musicEnabled) {
+            togglePlayback()
+          }
+        }}
+        className="fixed top-20 right-4 z-50 p-3 bg-card/80 backdrop-blur-sm rounded-full shadow-lg border border-border/50 hover:bg-card transition-colors"
+        aria-label={musicEnabled ? 'Выключить музыку' : 'Включить музыку'}
+      >
+        {musicEnabled ? (
+          <Volume2 className="h-5 w-5 text-primary" />
+        ) : (
+          <VolumeX className="h-5 w-5 text-muted-foreground" />
+        )}
+      </button>
+
+      <div className="flex flex-col space-y-6 max-w-md w-full mx-auto relative z-20">
         {/* Header Section */}
         <div className="text-center space-y-3">
           {/* Logo/Icon */}
