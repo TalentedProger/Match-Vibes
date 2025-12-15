@@ -68,7 +68,7 @@ export default function Home() {
           }
         }}
         className="fixed top-16 right-4 z-[100] p-2.5 bg-card/95 backdrop-blur-sm rounded-full shadow-lg border border-border/50 hover:bg-card transition-colors"
-        style={{ position: 'fixed', top: '64px', right: '16px' }}
+        style={{ position: 'fixed', top: '128px', right: '16px' }}
         aria-label={musicEnabled ? 'Выключить музыку' : 'Включить музыку'}
       >
         {musicEnabled ? (
